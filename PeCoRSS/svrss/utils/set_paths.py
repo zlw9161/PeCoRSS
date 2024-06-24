@@ -21,7 +21,7 @@ if __name__ == '__main__':
     configurable.set('data', 'cwr', args.cwr)
     configurable.set('data', 'pdr', args.pdr)
     configurable.set('data', 'carrada', args.carrada)
-    configurable.set('data', '', args.rdsyn)
+    configurable.set('data', 'rdsyn', args.rdsyn)
     configurable.set('data', 'logs', args.logs)
     with open(config_path, 'w') as fp:
         configurable.config.write(fp)
