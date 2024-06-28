@@ -152,7 +152,8 @@ class ATTPool2D(nn.Module):
         att_mask = F.interpolate(att_mask, [x.shape[3], x.shape[4]]) # B x T x 64 x 64
         # expand att_mask on the channel dimension
         att_mask = torch.unsqueeze(att_mask, 1)
-        att_mask = torch.repeat_interleave(att_mask, repeats=x.shape[1], dim=1)
+        # for model visualization@20240626
+        # att_mask = torch.repeat_interleave(att_mask, repeats=x.shape[1], dim=1)
         x_att = att_mask * x
         # sum along the time dimension
         x_att = torch.sum(x_att, dim=2)
@@ -339,11 +340,11 @@ class TARSSNet_V2_RA(nn.Module):
         
 
         # Decoding
-        self.rd_single_conv_block2_1x1 = ConvBlock(in_ch=384, out_ch=128, k_size=1, pad=0, dil=1)
+        self.rd_single_conv_block2_1x1 = ConvBlock(in_ch=128, out_ch=128, k_size=1, pad=0, dil=1)
         
 
         # Pallel range-Doppler (RD) and range-angle (RA) decoding branches
-        self.rd_upconv1 = nn.ConvTranspose2d(384, 128, (2, 2), stride=(2, 2))
+        self.rd_upconv1 = nn.ConvTranspose2d(256, 128, (2, 2), stride=(2, 2))
         
         self.rd_double_conv_block1 = DoubleConvBlock(in_ch=128, out_ch=128, k_size=3,
                                                      pad=1, dil=1)

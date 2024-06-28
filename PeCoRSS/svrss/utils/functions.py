@@ -35,9 +35,9 @@ def get_class_weights(dataset_type, signal_type):
     
     if dataset_type == 'CWRdata':
         file_name = 'cwr'
-    elif dataset_type == 'PWRdata':
-        file_name = 'pwr'
-    elif dataset_type in ['Carrada_RD', 'Carrada_RA']:
+    elif dataset_type == 'PDRdata':
+        file_name = 'pdr'
+    elif dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
         file_name = 'carrada'
     else:
         raise ValueError('Dataset type {} is not supported.'.format(dataset_type))
@@ -55,11 +55,11 @@ def get_class_weights(dataset_type, signal_type):
     if dataset_type == 'CWRdata':
         weights = np.array([weights['Background'], weights['UAV'],
                         weights['Pedestrian'], weights['Vehicle']])
-    elif dataset_type == 'PWRdata':
+    elif dataset_type == 'PDRdata':
         weights = np.array([weights['Background'], weights['UAV'],
                         weights['Pedestrian'], weights['Car'],
                         weights['Boat']])
-    elif dataset_type in ['Carrada_RD', 'Carrada_RA']:
+    elif dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
         weights = np.array([weights['background'], weights['pedestrian'],
                         weights['cyclist'], weights['car']])
     else:
@@ -160,9 +160,9 @@ def normalize(data, dataset_type, signal_type, norm_type='local'):
     """
     if dataset_type == 'CWRdata':
         file_name = 'cwr'
-    elif dataset_type == 'PWRdata':
-        file_name = 'pwr'
-    elif dataset_type in ['Carrada_RD', 'Carrada_RA']:
+    elif dataset_type == 'PDRdata':
+        file_name = 'pdr'
+    elif dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
         file_name = 'carrada'
     else:
         raise ValueError('Dataset type {} is not supported.'.format(dataset_type))
@@ -242,7 +242,9 @@ def define_loss(dataset_type, signal_type, custom_loss, device):
         weights = get_class_weights(dataset_type, signal_type)
         loss = [nn.CrossEntropyLoss(weight=weights.to(device).float()), lambda x, y: torch.tensor(0., device=x.device)]
     elif custom_loss == 'sdice':
-        loss = SoftDiceLoss()
+        loss = [SoftDiceLoss(), lambda x, y: torch.tensor(0., device=x.device)]
+    elif custom_loss == 'focal':
+        loss = [FocalLoss(weight=None), lambda x, y: torch.tensor(0., device=x.device)]
     elif custom_loss == 'wce_w10sdice':
         weights = get_class_weights(dataset_type, signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
@@ -408,9 +410,9 @@ def get_qualitatives(outputs, masks, paths, seq_name, quali_iter, signal_type=No
         mask_fpath = folder_path / 'mask'
         output_fpath = folder_path / 'output'
     
-    if dataset_type == 'CWRdata':
+    if dataset_type in ['CWRdata', 'Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
         num_class = 4
-    elif dataset_type == 'PWRdata':
+    elif dataset_type == 'PDRdata':
         num_class = 5
     else:
         raise KeyError(f'Dataset {dataset_type} has not been supported yet.')

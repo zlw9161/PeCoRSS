@@ -151,7 +151,8 @@ class ATTPool2D(nn.Module):
         att_mask = F.interpolate(att_mask, [x.shape[3], x.shape[4]]) # B x T x 64 x 64
         # expand att_mask on the channel dimension
         att_mask = torch.unsqueeze(att_mask, 1)
-        att_mask = torch.repeat_interleave(att_mask, repeats=x.shape[1], dim=1)
+        # for model visualization @20240628
+        # att_mask = torch.repeat_interleave(att_mask, repeats=x.shape[1], dim=1)
         x_att = att_mask * x
         # sum along the time dimension
         x_att = torch.sum(x_att, dim=2)

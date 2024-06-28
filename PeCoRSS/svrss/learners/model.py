@@ -132,6 +132,7 @@ class Model(nn.Module):
             self.net = nn.DataParallel(self.net, device_ids=[0])
             #self.net = nn.DataParallel(self.net, device_ids=[3])
         # self.net.to(self.device)
+        model_vis_flag = True
 
         for epoch in range(self.nb_epochs):
             # lt @20230417
@@ -183,6 +184,9 @@ class Model(nn.Module):
                     # if self.model_name != 'mvnet':
                     #     ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
                     optimizer.zero_grad()
+                    if model_vis_flag:
+                        self.visualizer.model_visualization(self.net, rd_data)
+                        model_vis_flag = False
                     rd_outputs = self.net(rd_data) # svrss:rd_data=[6,1,5,124,2048]
                     rd_outputs = rd_outputs.to(self.device)
                     #print('rd_outputs.shape', rd_outputs.shape)
@@ -382,7 +386,7 @@ class Model(nn.Module):
                                 # if best_test_dop > 0.67:
                                 #     exit(0)
                                 flag_save = True
-                                name_result.append('test_doppler')
+                                name_result.append(self.model_name)
                             
                             if flag_save:
                                 self._save_results(name_result)
@@ -408,7 +412,7 @@ class Model(nn.Module):
     def _save_results(self, names):
         for name in names:
             results_path = self.paths['results'] / (name + '_' + 'results.json')
-            model_path = self.paths['results'] / (name + '_' + 'model.pt')
+            model_path = self.paths['results'] / (name + '.pt')
             with open(results_path, "w") as fp:
                 json.dump(self.results, fp)
             # zlw@20240424 self.net.module.state_dict for higher torch version

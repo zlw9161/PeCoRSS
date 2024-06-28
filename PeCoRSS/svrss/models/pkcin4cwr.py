@@ -145,9 +145,10 @@ class PeakConv2D(nn.Module):
     # getting p_c (the center point coords) from the padded grid of input x
     def _get_p_c(self, b, h, w, N, dtype):
         # generating pc_grid
+        # for UserWarning in meshgrid, indexing='ij' @20240627
         p_c_x, p_c_y = torch.meshgrid(
             torch.arange(self.padding[2], h * self.pc_strd + self.padding[2], self.pc_strd),
-            torch.arange(self.padding[0], w * self.pc_strd + self.padding[0], self.pc_strd))
+            torch.arange(self.padding[0], w * self.pc_strd + self.padding[0], self.pc_strd), indexing='ij')
         p_c_x = torch.flatten(p_c_x).view(1, 1, h, w).repeat(1, N, 1, 1)
         p_c_y = torch.flatten(p_c_y).view(1, 1, h, w).repeat(1, N, 1, 1)
         # p_c: 1x2NxHxW
@@ -167,7 +168,7 @@ class PeakConv2D(nn.Module):
 
         prf_x_idx, prf_y_idx = torch.meshgrid(
             torch.arange(h_t, h_d + 1),
-            torch.arange(w_l, w_r + 1))
+            torch.arange(w_l, w_r + 1), indexing='ij')
 
         # grid_size*2, 1 grid_size = (h_d*2+1) * (w_r*2+1)
         # taking positions clockwise

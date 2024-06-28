@@ -152,7 +152,8 @@ class ATTPool2D(nn.Module):
         att_mask = F.interpolate(att_mask, [x.shape[3], x.shape[4]]) # B x T x 64 x 64
         # expand att_mask on the channel dimension
         att_mask = torch.unsqueeze(att_mask, 1)
-        att_mask = torch.repeat_interleave(att_mask, repeats=x.shape[1], dim=1)
+        # for model visualization @20240628
+        # att_mask = torch.repeat_interleave(att_mask, repeats=x.shape[1], dim=1)
         x_att = att_mask * x
         # sum along the time dimension
         x_att = torch.sum(x_att, dim=2)
@@ -166,15 +167,15 @@ class ASPPBlock(nn.Module):
 
     def __init__(self, in_ch, out_ch=256):
         super().__init__()
-        self.global_avg_pool = nn.AvgPool2d((64, 64))
+        self.global_avg_pool = nn.AvgPool2d((16, 800))
         self.conv1_1x1 = nn.Conv2d(in_ch, out_ch, kernel_size=1, padding=0, dilation=1)
         self.single_conv_block1_1x1 = ConvBlock(in_ch, out_ch, k_size=1, pad=0, dil=1)
         self.single_conv_block1_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=6, dil=6)
         self.single_conv_block2_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=12, dil=12)
         self.single_conv_block3_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=18, dil=18)
 
-    def forward(self, x):
-        x1 = F.interpolate(self.global_avg_pool(x), size=(64, 64), align_corners=False,
+    def forward(self, x):  # x.shape: [2, 128, 16, 800]
+        x1 = F.interpolate(self.global_avg_pool(x), size=(16, 800), align_corners=False,
                            mode='bilinear')
         x1 = self.conv1_1x1(x1)
         x2 = self.single_conv_block1_1x1(x)
@@ -303,7 +304,7 @@ class EncodingBranch(nn.Module):
         return x2_down, x3
 
 
-class TARSSNet_V2(nn.Module):
+class TARSS4PDR_V2(nn.Module):
     """ 
     TARSS-Net w/ Spatio-TRAP for KuRALS-PDR data.
 
@@ -339,11 +340,11 @@ class TARSSNet_V2(nn.Module):
         
 
         # Decoding
-        self.rd_single_conv_block2_1x1 = ConvBlock(in_ch=384, out_ch=128, k_size=1, pad=0, dil=1)
+        self.rd_single_conv_block2_1x1 = ConvBlock(in_ch=128, out_ch=128, k_size=1, pad=0, dil=1)
         
 
         # Pallel range-Doppler (RD) and range-angle (RA) decoding branches
-        self.rd_upconv1 = nn.ConvTranspose2d(384, 128, (2, 1), stride=(2, 1))
+        self.rd_upconv1 = nn.ConvTranspose2d(256, 128, (2, 1), stride=(2, 1))
         
         self.rd_double_conv_block1 = DoubleConvBlock(in_ch=128, out_ch=128, k_size=3,
                                                      pad=1, dil=1)
@@ -359,7 +360,7 @@ class TARSSNet_V2(nn.Module):
         
 
 
-    def forward(self, x_rd, x_ra, x_ad):
+    def forward(self, x_rd):
         # Backbone
         rd_features, rd_latent = self.rd_encoding_branch(x_rd)
        

@@ -5,15 +5,15 @@ from svrss.utils import SVRSS_HOME
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Settings paths for training and testing.')
-    parser.add_argument('--cwr', default='/CWRdata',
+    parser.add_argument('--cwr', default='/home/wen/Data/Projects/DataSets/KuRALS/KuCW',
                         help='Path to the continuous wave radar dataset.')
-    parser.add_argument('--pdr', default='/PDRdata',
+    parser.add_argument('--pdr', default='/home/wen/Data/Projects/DataSets/KuRALS/KuPD',
                         help='Path to the pulse doppler radar dataset.')
-    parser.add_argument('--carrada', default='/Carrada',
+    parser.add_argument('--carrada', default='/home/wen/Data/Projects/DataSets/Carrada',
                         help='Path to the Carrada dataset.')
     parser.add_argument('--rdsyn', default='/RDSyn',
                         help='Path to the synthesis radar dataset.')
-    parser.add_argument('--logs', default='/root/workspace/logs',
+    parser.add_argument('--logs', default='/home/wen/Data/Projects/PeCoLab/logs',
                         help='Path to the save the logs and models.')
     args = parser.parse_args()
     config_path = SVRSS_HOME / 'config_files' / 'config.ini'

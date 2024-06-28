@@ -63,7 +63,7 @@ class PeCoRSVDataset(Dataset):
         self.add_temp = add_temp
         # self.dataset = self.dataset[self.n_frames-1:]  # remove n first frames
         if self.dataset_type in ['CarradaRAC_RD', 'CarradaRAC_RA']:
-            self.path_to_annots = self.path_to_frames / 'annotations_rac' / self.annotation_type
+            self.path_to_annots = self.path_to_frames / 'new_annotations' / self.annotation_type
         else:
             self.path_to_annots = self.path_to_frames / 'annotations' / self.annotation_type
 

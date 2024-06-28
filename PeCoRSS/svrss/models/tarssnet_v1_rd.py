@@ -150,8 +150,9 @@ class ATTPool(nn.Module):
         att_sc = torch.permute(att_sc, (0,2,1))
         att_sc = torch.unsqueeze(att_sc, 3)
         att_sc = torch.unsqueeze(att_sc, 4)
-        att_sc = torch.repeat_interleave(att_sc, repeats=x.shape[3], dim=3)
-        att_sc = torch.repeat_interleave(att_sc, repeats=x.shape[4], dim=4) #3,128,5,32,512
+        # for model visualization@20240626
+        # att_sc = torch.repeat_interleave(att_sc, repeats=x.shape[3], dim=3)
+        # att_sc = torch.repeat_interleave(att_sc, repeats=x.shape[4], dim=4) #3,128,5,32,512
         x_att = att_sc * x
         # sum along the time dimension
         x_att = torch.sum(x_att, dim=2)

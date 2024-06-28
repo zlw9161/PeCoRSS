@@ -279,7 +279,7 @@ class ASPPBlock(nn.Module):
 
     def __init__(self, in_ch, out_ch=256):
         super().__init__()
-        self.global_avg_pool = nn.AvgPool2d((64, 200)) # 62, 512 for cwr
+        self.global_avg_pool = nn.AvgPool2d((32, 200)) # 62, 512 for cwr
         self.conv1_1x1 = nn.Conv2d(in_ch, out_ch, kernel_size=1, padding=0, dilation=1)
         self.single_conv_block1_1x1 = ConvBlock(in_ch, out_ch, k_size=1, pad=0, dil=1)
         self.single_conv_block1_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=6, dil=6)
@@ -287,7 +287,7 @@ class ASPPBlock(nn.Module):
         self.single_conv_block3_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=18, dil=18)
 
     def forward(self, x):
-        x1 = F.interpolate(self.global_avg_pool(x), size=(62, 512), align_corners=False,
+        x1 = F.interpolate(self.global_avg_pool(x), size=(32, 200), align_corners=False,
                            mode='bilinear')
         x1 = self.conv1_1x1(x1)
         x2 = self.single_conv_block1_1x1(x)

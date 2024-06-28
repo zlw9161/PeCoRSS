@@ -98,10 +98,15 @@ class PeakConv2D(nn.Module):
         # take PRF as input and output the center point output of PRF;
         # kernel channel = in_ch*2: depth_concat(p_c, p_r)
         # since each p_c is expanded as a tensor of kernel scale RF, the stride = kernel_size
-        self.peak_conv = nn.Conv2d(in_ch, out_ch,
+        self.peak_conv1 = nn.Conv2d(in_ch, in_ch,
                                    kernel_size=self.kernel_size,
                                    padding=0,
                                    stride=self.stride,
+                                   bias=self.bias)
+        self.peak_conv2 = nn.Conv2d(in_ch, out_ch,
+                                   kernel_size=(1, 1),
+                                   padding=0,
+                                   stride=1,
                                    bias=self.bias)
         #self.peak_conv.register_backward_hook(self._set_lr)
 
@@ -138,11 +143,11 @@ class PeakConv2D(nn.Module):
         # sample x_r (b, c, h, w, N) using p_r
         x_r = self._sample_x(self.zero_padding(x), p_r, N)
         x_prf = self._reshape_x_prf(k_pk[0], k_pk[1], x_r)
-        x_prf = self.peak_conv(x_r)
+        x_prf = self.peak_conv1(x_prf)
         x_prf = x - x_prf
 
         # out: (b, c, h, w)
-        out = self.peak_conv(x_prf)
+        out = self.peak_conv2(x_prf)
         return out
 
     # getting p_c (the center point coords) from the padded grid of input x
@@ -282,7 +287,7 @@ class ASPPBlock(nn.Module):
 
     def __init__(self, in_ch, out_ch=256):
         super().__init__()
-        self.global_avg_pool = nn.AvgPool2d((64, 200)) # 64, 512 for cwr
+        self.global_avg_pool = nn.AvgPool2d((62, 512)) # 64, 512 for cwr
         self.conv1_1x1 = nn.Conv2d(in_ch, out_ch, kernel_size=1, padding=0, dilation=1)
         self.single_conv_block1_1x1 = ConvBlock(in_ch, out_ch, k_size=1, pad=0, dil=1)
         self.single_conv_block1_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=6, dil=6)
@@ -347,7 +352,7 @@ class EncodingBranch(nn.Module):
         return x2_down, x3
 
 
-class PKCIn4PDR_Dns(nn.Module):
+class PKCIn4CWR_Dns(nn.Module):
     """
     PKCIn-Net w/ Vanilla-PeakConv for KuRALS-CWR data
 

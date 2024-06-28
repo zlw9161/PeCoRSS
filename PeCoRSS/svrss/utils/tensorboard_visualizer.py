@@ -183,6 +183,9 @@ class TensorboardMultiLossVisualizer:
                                metrics[signal_type]['dice'],
                                iteration)
 
+    def model_visualization(self, network, data_sample):
+        self.writer.add_graph(network, (data_sample, ))
+
     def update_img_masks(self, pred_grid, gt_grid, iteration):
         self.writer.add_image('Predicted_masks', pred_grid, iteration)
         self.writer.add_image('Ground_truth_masks', gt_grid, iteration)

@@ -27,7 +27,7 @@ class Initializer:
             data = CWRdata()
         elif self.cfg['dataset'] == 'PDRdata':
             data = PDRdata()
-        elif self.cfg['dataset'] in ['Carrada_RD', 'Carrada_RA']:
+        elif self.cfg['dataset'] in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
             data = Carrada()
         elif self.cfg['dataset'] == 'RDSyn':
             data = RDSyn()
@@ -48,6 +48,9 @@ class Initializer:
 
     def _get_dataloaders(self):
         trainset, valset, testset = self._get_datasets()
+        print('>>>train_set: \n', '\n'.join(trainset.seq_names))
+        print('>>>valid_set: \n', '\n'.join(valset.seq_names))
+        print('>>>test__set: \n', '\n'.join(testset.seq_names))
         trainloader = DataLoader(trainset, batch_size=1, shuffle=True, num_workers=0)
         valloader = DataLoader(valset, batch_size=1, shuffle=False, num_workers=0)
         testloader = DataLoader(testset, batch_size=1, shuffle=False, num_workers=0)
@@ -59,7 +62,7 @@ class Initializer:
         name_exp = (self.cfg['model'] + '_' +
                     'e' + str(self.cfg['nb_epochs']) + '_' +
                     'lr' + str(self.cfg['lr']) + '_' +
-                    's' + str(self.cfg['torch_seed']))
+                    self.cfg['custom_loss'])
         self.cfg['name_exp'] = name_exp
         folder_path = self.paths['logs'] / self.cfg['dataset'] / self.cfg['model'] / name_exp
         print('>>>>>Log_Path<<<<<', self.paths['logs'])

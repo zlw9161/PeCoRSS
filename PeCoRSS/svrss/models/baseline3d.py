@@ -100,11 +100,11 @@ class EncodingBranch(nn.Module):
         super().__init__()
         self.n_frames = n_frames
         self.signal_type = signal_type
-        self.single_3d_conv_block_1 = TREBlock(in_ch=1, out_ch=8,
+        self.single_3d_conv_block_1 = TREBlock(in_ch=1, out_ch=128,
                                                k_size=(3, 3, 3),
                                                strd=(1, 1, 1),
                                                pad=(0, 1, 1))
-        self.single_3d_conv_block_2 = TREBlock(in_ch=8, out_ch=8,
+        self.single_3d_conv_block_2 = TREBlock(in_ch=128, out_ch=128,
                                                k_size=(3, 3, 3),
                                                strd=(1, 1, 1),
                                                pad=(0, 1, 1))
@@ -117,22 +117,22 @@ class EncodingBranch(nn.Module):
         self.single_conv_block1_3x3 = ConvBlock(in_ch=128, out_ch=128, k_size=3, pad=1, dil=1)
         self.single_conv_block2_3x3 = ConvBlock(in_ch=128, out_ch=128, k_size=3, pad=1, dil=1)
         self.single_conv_block1_1x1 = ConvBlock(in_ch=128, out_ch=128, k_size=1, pad=0, dil=1)
-        self.tfoc_conv_1 = TREBlock(in_ch=8, out_ch=128,
-                                    k_size=(3, 3, 3),
-                                    strd=(1, 1, 1),
-                                    pad=(0, 1, 1))
-        self.tfoc_conv_2 = TREBlock(in_ch=128, out_ch=128,
-                                    k_size=(3, 3, 3),
-                                    strd=(1, 1, 1),
-                                    pad=(0, 1, 1))
+        self.single_2d_conv_block_1 = TREBlock(in_ch=128, out_ch=128,
+                                               k_size=(1, 3, 3),
+                                               strd=(1, 1, 1),
+                                               pad=(0, 1, 1))
+        self.single_2d_conv_block_2 = TREBlock(in_ch=128, out_ch=128,
+                                               k_size=(1, 3, 3),
+                                               strd=(1, 1, 1),
+                                               pad=(0, 1, 1))
 
     def forward(self, x):
         x0 = self.single_3d_conv_block_1(x)
         x0 = self.single_3d_conv_block_2(x0)  # [b,16,(n_frames-3+1-3+1),h,w]
 
 
-        x1 = self.tfoc_conv_1(x0)  # [b,128,1,h,w]
-        x1 = self.tfoc_conv_2(x1)
+        x1 = self.single_2d_conv_block_1(x0)  # [b,128,1,h,w]
+        x1 = self.single_2d_conv_block_2(x1)
 
         if self.signal_type in ('range_doppler', 'angle_doppler'):
             # The Doppler dimension requires a specific processing

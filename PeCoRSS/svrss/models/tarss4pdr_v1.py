@@ -150,8 +150,9 @@ class ATTPool(nn.Module):
         att_sc = torch.permute(att_sc, (0,2,1))
         att_sc = torch.unsqueeze(att_sc, 3)
         att_sc = torch.unsqueeze(att_sc, 4)
-        att_sc = torch.repeat_interleave(att_sc, repeats=x.shape[3], dim=3)
-        att_sc = torch.repeat_interleave(att_sc, repeats=x.shape[4], dim=4) #3,128,5,32,512
+        # for model visualization @20240628
+        # att_sc = torch.repeat_interleave(att_sc, repeats=x.shape[3], dim=3)
+        # att_sc = torch.repeat_interleave(att_sc, repeats=x.shape[4], dim=4) #3,128,5,32,512
         x_att = att_sc * x
         # sum along the time dimension
         x_att = torch.sum(x_att, dim=2)
@@ -165,15 +166,15 @@ class ASPPBlock(nn.Module):
 
     def __init__(self, in_ch, out_ch=256):
         super().__init__()
-        self.global_avg_pool = nn.AvgPool2d((31, 512))
+        self.global_avg_pool = nn.AvgPool2d((16, 200))
         self.conv1_1x1 = nn.Conv2d(in_ch, out_ch, kernel_size=1, padding=0, dilation=1)
         self.single_conv_block1_1x1 = ConvBlock(in_ch, out_ch, k_size=1, pad=0, dil=1)
         self.single_conv_block1_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=6, dil=6)
         self.single_conv_block2_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=12, dil=12)
         self.single_conv_block3_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=18, dil=18)
 
-    def forward(self, x): #3,128,32,512
-        x1 = F.interpolate(self.global_avg_pool(x), size=(31, 512), align_corners=False,
+    def forward(self, x): #3,128,16,200
+        x1 = F.interpolate(self.global_avg_pool(x), size=(16, 200), align_corners=False,
                            mode='bilinear')
         x1 = self.conv1_1x1(x1)
         x2 = self.single_conv_block1_1x1(x)
@@ -206,10 +207,10 @@ class TAM(nn.Module):
                                        k_size=(1, 2, 2),
                                        strd=(1, 2, 2),
                                        pad=(0, 0, 0))'''
-        self.spatial_squeeze_avg = nn.AvgPool3d(kernel_size=(1, 8, 128),
-                                                stride=(1, 8, 128))
-        self.spatial_squeeze_max = nn.MaxPool3d(kernel_size=(1, 8, 128),
-                                                stride=(1, 8, 128))
+        self.spatial_squeeze_avg = nn.AvgPool3d(kernel_size=(1, 4, 50),
+                                                stride=(1, 4, 50))
+        self.spatial_squeeze_max = nn.MaxPool3d(kernel_size=(1, 4, 50),
+                                                stride=(1, 4, 50))
         self.fc_layer_avg_max = nn.Linear(out_ch*2, out_ch)
         # initialize attention matrix
         # self.att_pool = nn.Parameter(torch.Tensor(out_ch*4, 1))

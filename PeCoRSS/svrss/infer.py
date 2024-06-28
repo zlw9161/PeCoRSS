@@ -33,9 +33,10 @@ def test_model():
     cfg['distributed'] = args.distributed
 
     paths = Paths().get()
+    # print(cfg)
     exp_name = cfg['name_exp'] + '_' + str(cfg['version'])
     path = paths['logs'] / cfg['dataset'] / cfg['model'] / exp_name
-    model_path = path / 'results' / 'model.pt'
+    model_path = path / 'results' / (cfg['model']+'.pt')
     test_results_path = path / 'results' / 'test_results.json'
 
     if cfg['model'] == 'cwrnet':
@@ -45,23 +46,39 @@ def test_model():
         model = PKCIn4CWR(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
     elif cfg['model'] == 'pkcin4cwr_dns':
         model = PKCIn4CWR_Dns(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
+    elif cfg['model'] == 'pkcin4pdr':
+        model = PKCIn4PDR(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
+    elif cfg['model'] == 'pkcin4pdr_dns':
+        model = PKCIn4PDR_Dns(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
     elif cfg['model'] == 'tarss4cwr_v1':
         model = TARSS4CWR_V1(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
     elif cfg['model'] == 'tarss4cwr_v2':
         model = TARSS4CWR_V2(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
+    elif cfg['model'] == 'tarss4pdr_v1':
+        model = TARSS4PDR_V1(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
+    elif cfg['model'] == 'tarss4pdr_v2':
+        model = TARSS4PDR_V2(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
     elif cfg['model'] == 'kuradnet':
         model = KuRADNet(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
     elif cfg['model'] == 'kuradnet_wskip':
         model = KuRADNet_WSkip(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
     elif cfg['model'] == 'baseline3d':
         if cfg['dataset'] in ['CarradaRAC_RA', 'Carrada_RA']:
-            model = BaseLine3D(n_classes=data['cfg']['nb_classes'],
-                               n_frames=data['cfg']['nb_input_channels'],
+            model = BaseLine3D(n_classes=cfg['nb_classes'],
+                               n_frames=cfg['nb_input_channels'],
                                signal_type='range_angle')
         else:
-            model = BaseLine3D(n_classes=data['cfg']['nb_classes'],
-                               n_frames=data['cfg']['nb_input_channels'],
+            model = BaseLine3D(n_classes=cfg['nb_classes'],
+                               n_frames=cfg['nb_input_channels'],
                                signal_type='range_doppler')
+    elif cfg['model'] == 'tarssnet_v1_ra':
+        model = TARSSNet_V1_RA(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
+    elif cfg['model'] == 'tarssnet_v1_rd':
+        model = TARSSNet_V1_RD(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
+    elif cfg['model'] == 'tarssnet_v2_ra':
+        model = TARSSNet_V2_RA(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
+    elif cfg['model'] == 'tarssnet_v2_rd':
+        model = TARSSNet_V2_RD(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
     elif cfg['model'] == 'unet':
         model = UNet(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
     elif cfg['model'] == 'fcn8s':
@@ -72,6 +89,8 @@ def test_model():
         raise ValueError('model {} is not supported in infer.py yet.'.format(cfg['model']))
     
     print('Number of trainable parameters in the model: %s' % str(count_params(model)))
+    print('Model Name: %s' % cfg['model'])
+    print('DataSet Name: %s' % cfg['dataset'])
     saved_model = torch.load(model_path, map_location=torch.device('cpu'))
     if args.distributed and args.sync_bn:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -82,7 +101,7 @@ def test_model():
 
     tester = Tester(cfg)
     print(tester)
-    
+
     if cfg['dataset'] in ['Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD']:
         data = Carrada()
     elif cfg['dataset'] == 'CWRdata':
@@ -95,28 +114,34 @@ def test_model():
     testset = SequenceDataset(test)
     seq_testloader = DataLoader(testset, batch_size=1, shuffle=False, num_workers=0)
     tester.set_annot_type(cfg['annot_type'])
-    if cfg['model'] in ['fcn8s', 'unet', 'deeplabv3plus']:
+    if cfg['model'] in ['fcn8s', 'unet', 'deeplabv3plus', 'kuradnet', 'kuradnet_wskip']:
         test_metrics = tester.predict(model, seq_testloader, get_quali=True, add_temp=False)
     else:
         # print(cfg['model'])
         test_metrics = tester.predict(model, seq_testloader, get_quali=True, add_temp=True)
     # if get_rank() == 0:
+
+    if cfg['dataset'] in ['Carrada_RA', 'CarradaRAC_RA']:
+        signal_type = 'range_angle'
+    else:
+        signal_type = 'range_doppler'
+
     print('Test Prec: '
-          'RD={}'.format(test_metrics['range_doppler']['prec']))
+          '({}) = {}'.format(signal_type, test_metrics[signal_type]['prec']))
     # zlw@20220227
     print('Test mIoU: '
-        'RD={}'.format(test_metrics['range_doppler']['miou']))
+        '({}) = {}'.format(signal_type, test_metrics[signal_type]['miou']))
     print('Test mIoU by class: '
-        'RD={}'.format(test_metrics['range_doppler']['miou_by_class'][0:2]))
-    print(test_metrics['range_doppler']['miou_by_class'][2:])
+        '({}) = {}'.format(signal_type, test_metrics[signal_type]['miou_by_class'][0:2]))
+    print(test_metrics[signal_type]['miou_by_class'][2:])
     print('Test Dice: '
-        'RD={}'.format(test_metrics['range_doppler']['dice']))
+        '({}) = {}'.format(signal_type, test_metrics[signal_type]['dice']))
     print('Test Dice by class: '
-        'RD={}'.format(test_metrics['range_doppler']['dice_by_class'][0:2]))
-    print(test_metrics['range_doppler']['miou_by_class'][2:])
-    print('Confusion matrix: RD=')
-    for i in range(5):
-        print('{}'.format(test_metrics['range_doppler']['confusion_matrix'][i]))
+        '({}) = {}'.format(signal_type, test_metrics[signal_type]['dice_by_class'][0:2]))
+    print(test_metrics[signal_type]['miou_by_class'][2:])
+    print('Confusion matrix: ({}) = '.format(signal_type))
+    for i in range(cfg['nb_classes']):
+        print('{}'.format(test_metrics[signal_type]['confusion_matrix'][i]))
 
 if __name__ == '__main__':
     test_model()
