@@ -16,6 +16,7 @@ from svrss.utils.tensorboard_visualizer import TensorboardMultiLossVisualizer
 from svrss.utils.distributed_utils import get_rank, reduce_value
 import random
 import time
+from tqdm import tqdm
 
 
 class Model(nn.Module):
@@ -127,11 +128,6 @@ class Model(nn.Module):
         best_test_dop = 0
         best_test_ang = 0
         best_test_dop_plus_ang = 0
-        # zlw@20211012
-        if torch.cuda.device_count() > 1:
-            self.net = nn.DataParallel(self.net, device_ids=[0])
-            #self.net = nn.DataParallel(self.net, device_ids=[3])
-        # self.net.to(self.device)
         model_vis_flag = True
 
         for epoch in range(self.nb_epochs):
@@ -142,7 +138,7 @@ class Model(nn.Module):
             else:
                 if epoch != 0 and epoch < self.T_max:
                     scheduler.step()
-            for _, sequence_data in enumerate(train_loader):
+            for _, sequence_data in enumerate(tqdm(train_loader)):
                 seq_name, seq = sequence_data
                 if self.dataset == 'CWRdata':
                     path_to_frames = self.paths['CWRdata'] / seq_name[0]
@@ -184,8 +180,9 @@ class Model(nn.Module):
                     # if self.model_name != 'mvnet':
                     #     ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
                     optimizer.zero_grad()
-                    if model_vis_flag:
-                        self.visualizer.model_visualization(self.net, rd_data)
+                    if model_vis_flag and self.rank == 0:
+                        vis_net = self.net.module if self.distributed or isinstance(self.net, nn.parallel.DataParallel) else self.net
+                        self.visualizer.model_visualization(vis_net, rd_data)
                         model_vis_flag = False
                     rd_outputs = self.net(rd_data) # svrss:rd_data=[6,1,5,124,2048]
                     rd_outputs = rd_outputs.to(self.device)
