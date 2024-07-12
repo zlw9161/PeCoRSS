@@ -5,39 +5,48 @@ import sys
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 from distutils.core import Distribution
 from distutils.command.install import install
+from setuptools.command.develop import develop
 
-class PeCoRSSDistribution(Distribution):
-      def __init__(self, attrs=None):
-            self.with_cuda = None
-            super().__init__(attrs=attrs)
-            
-class PeCoRSSInstallCommand(install):
-      user_options = BuildExtension.user_options + [
+class PeCoRSSBaseCommand:
+    user_options = [
         ('with-cuda', None, 'Include CUDA extension')
-      ]
-      
-      def initialize_options(self):
-            install.initialize_options(self)
-            self.with_cuda = None
-      
-      def finalize_options(self):
-            install.finalize_options(self)
-            if self.with_cuda:
-                  self.distribution.with_cuda = True
+    ]
+
+    def initialize_options(self):
+        super().initialize_options()
+        self.with_cuda = None
+
+    def finalize_options(self):
+        super().finalize_options()
+        if self.with_cuda:
+            self.distribution.with_cuda = True
+
+class PeCoRSSInstallCommand(PeCoRSSBaseCommand, install):
+    user_options = install.user_options + PeCoRSSBaseCommand.user_options
+
+class PeCoRSSDevelopCommand(PeCoRSSBaseCommand, develop):
+    user_options = develop.user_options + PeCoRSSBaseCommand.user_options
+            
+class PeCoRSSBuildExtCommand(BuildExtension):
+    def run(self):
+        if not hasattr(self.distribution, 'with_cuda') or not self.distribution.with_cuda:
+            print("Skipping CUDA extension installation.")
+            return
+        super().run()
                   
-def get_extensions():
-      extenstions = []
-      if 'with_cuda' in Distribution.get_option_dict('install').get('with_cuda', (None, None))[1]:
-            extenstions.append(
-                  CUDAExtension(
-                        name="prf_cuda",
-                        source=["extension/prf_cuda_ops.cpp", "extension/prf_cuda.cu"],
-                  )
+def get_extensions(with_cuda):
+    extensions = []
+    if with_cuda:
+        extensions.append(
+            CUDAExtension(
+                name="prf_cuda",
+                sources=["svrss/extension/prf_cuda_ops.cpp", "svrss/extension/prf_cuda.cu"],
             )
-            return extenstions
+        )
+    return extensions
       
 def has_cuda_option():
-      return '--with-cuda' in sys.argv
+    return '--with-cuda' in sys.argv
 
 setup(name='pecorss',
       version='1.0',
@@ -60,7 +69,7 @@ setup(name='pecorss',
       packages=find_packages(),
       ext_modules=get_extensions(has_cuda_option()),
       cmdclass={
-            'build_ext': BuildExtension,
-            'install': PeCoRSSInstallCommand
-      },
-      distclass=PeCoRSSDistribution)
+            'install': PeCoRSSInstallCommand,
+            'build_ext': PeCoRSSBuildExtCommand,
+            'develop': PeCoRSSDevelopCommand
+      })
