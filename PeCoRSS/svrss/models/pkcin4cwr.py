@@ -223,7 +223,7 @@ class PeakConv2D(nn.Module):
         # index = index_x * w_pad + index_y
         # (b, c, h*w*N)
         index = index.contiguous().unsqueeze(dim=1).expand(-1, c, -1, -1, -1).contiguous().view(b, c, -1)
-        index = index.long()
+        index = index.long().to(x_pad.device)
         x_r = x_pad.gather(dim=-1, index=index).contiguous().view(b, c, h, w, N)
         return x_r
 
@@ -310,11 +310,13 @@ class EncodingBranch(nn.Module):
         Supported: 'range_doppler', 'range_angle' and 'angle_doppler'
     """
 
-    def __init__(self, signal_type):
+    def __init__(self, signal_type, n_frames):
         super().__init__()
         self.signal_type = signal_type
-        self.double_3dconv_block1 = Double3DConvBlock(in_ch=1, out_ch=32, k_size=3,
-                                                      pad=(0, 1, 1), dil=1)
+        self.n_frames = n_frames
+        self.double_3dconv_block1 = Double3DConvBlock(in_ch=1, out_ch=32, 
+                                                      k_size=(1+n_frames//2, 3, 3),
+                                                      pad=(0, 1, 1), dil=1) # 首先进入一个3d卷积层，TODO：不知道是在什么维度上操作
         self.doppler_max_pool = nn.MaxPool2d(2, stride=(1, 2))
         self.max_pool = nn.MaxPool2d(2, stride=2)
         # self.double_conv_block2 = DoubleConvBlock(in_ch=128, out_ch=128, k_size=3,
@@ -331,14 +333,14 @@ class EncodingBranch(nn.Module):
 
     def forward(self, x):
         x1 = self.double_3dconv_block1(x)
-        x1 = torch.squeeze(x1, 2)  # remove temporal dimension
+        x1 = torch.squeeze(x1, 2)  # remove temporal dimension 是有时间维度的，删除了，TODO: 难道这部分输出后维度为1？
 
-        x1_pad = F.pad(x1, (0, 0, 0, 0), "constant", 0)
+        x1_pad = F.pad(x1, (0, 0, 0, 0), "constant", 0) # 进行pad， 这是什么操作，TODO: 4个0？
         x1_down = self.max_pool(x1_pad)
 
-        x2 = self.double_pkc_block(x1_down)
-        x2_pad = F.pad(x2, (0, 0, 0, 1), "constant", 0)
-        x2_down = self.doppler_max_pool(x2_pad)
+        x2 = self.double_pkc_block(x1_down) # 调用了pkc卷积块，TODO: 需要明确其卷积块
+        x2_pad = F.pad(x2, (0, 0, 0, 1), "constant", 0) # 这部分的pad是做什么， TODO: 是因为上面的卷积会改变输入张量形状吗
+        x2_down = self.doppler_max_pool(x2_pad) # 
 
         x3 = self.single_conv_block1_1x1(x2_down)
         # return input of ASPP block + latent features
@@ -363,7 +365,7 @@ class PKCIn4CWR(nn.Module):
         self.n_frames = n_frames
 
         # Backbone (encoding)
-        self.rd_encoding_branch = EncodingBranch('range_doppler')
+        self.rd_encoding_branch = EncodingBranch('range_doppler', self.n_frames)
 
         # ASPP Blocks
         self.rd_aspp_block = ASPPBlock(in_ch=64, out_ch=128)
