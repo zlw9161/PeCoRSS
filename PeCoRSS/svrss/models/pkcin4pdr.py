@@ -132,10 +132,12 @@ class EncodingBranch(nn.Module):
         Supported: 'range_doppler', 'range_angle' and 'angle_doppler'
     """
 
-    def __init__(self, signal_type):
+    def __init__(self, signal_type, n_frames):
         super().__init__()
         self.signal_type = signal_type
-        self.double_3dconv_block1 = Double3DConvBlock(in_ch=1, out_ch=32, k_size=3,
+        self.n_frames = n_frames
+        self.double_3dconv_block1 = Double3DConvBlock(in_ch=1, out_ch=32, 
+                                                      k_size=(1+n_frames//2, 3, 3),
                                                       pad=(0, 1, 1), dil=1)
         self.doppler_max_pool = nn.MaxPool2d(2, stride=(1, 2))
         self.max_pool = nn.MaxPool2d(2, stride=2)
@@ -185,7 +187,7 @@ class PKCIn4PDR(nn.Module):
         self.n_frames = n_frames
 
         # Backbone (encoding)
-        self.rd_encoding_branch = EncodingBranch('range_doppler')
+        self.rd_encoding_branch = EncodingBranch('range_doppler', self.n_frames)
 
         # ASPP Blocks
         self.rd_aspp_block = ASPPBlock(in_ch=64, out_ch=128)

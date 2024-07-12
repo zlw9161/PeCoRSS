@@ -184,7 +184,10 @@ class TensorboardMultiLossVisualizer:
                                iteration)
 
     def model_visualization(self, network, data_sample):
-        self.writer.add_graph(network, (data_sample, ))
+        try:
+            self.writer.add_graph(network, (data_sample, ))
+        except:
+            print("Warning: Model Visualization Failed!!!")
 
     def update_img_masks(self, pred_grid, gt_grid, iteration):
         self.writer.add_image('Predicted_masks', pred_grid, iteration)

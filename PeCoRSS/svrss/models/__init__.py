@@ -1,6 +1,7 @@
 # for KuRALS-CWR
 from .cwrnet import CWRNet
 from .pkcin4cwr import PKCIn4CWR
+from .pkcin4cwr_2d import PKCIn4CWR2D
 from .pkcin4cwr_dns import PKCIn4CWR_Dns
 from .tarss4cwr_v1 import TARSS4CWR_V1 # depth-trap
 from .tarss4cwr_v2 import TARSS4CWR_V2 # spatio-trap

@@ -304,7 +304,7 @@ else:
             # index = index_x * w_pad + index_y
             # (b, c, h*w*N)
             index = index.contiguous().unsqueeze(dim=1).expand(-1, c, -1, -1, -1).contiguous().view(b, c, -1)
-            index = index.long()
+            index = index.long().to(x_pad.device)
             x_r = x_pad.gather(dim=-1, index=index).contiguous().view(b, c, h, w, N)
             return x_r
 

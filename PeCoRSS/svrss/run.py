@@ -4,7 +4,7 @@ import json
 from svrss.utils.functions import count_params
 from svrss.learners.initializer import Initializer
 from svrss.learners.model import Model
-from svrss.models import CWRNet, PKCIn4CWR, PKCIn4CWR_Dns, TARSS4CWR_V1, TARSS4CWR_V2
+from svrss.models import CWRNet, PKCIn4CWR, PKCIn4CWR2D, PKCIn4CWR_Dns, TARSS4CWR_V1, TARSS4CWR_V2
 from svrss.models import KuRADNet, KuRADNet_WSkip, PKCIn4PDR, PKCIn4PDR_Dns, TARSS4PDR_V1, TARSS4PDR_V2
 from svrss.models import BaseLine3D, TARSSNet_V1_RD, TARSSNet_V1_RA, TARSSNet_V2_RD, TARSSNet_V2_RA
 from svrss.models import UNet, FCN8s, DeepLabV3Plus_Res101
@@ -47,6 +47,9 @@ def main():
     elif cfg['model'] == 'pkcin4cwr':
         net = PKCIn4CWR(n_classes=data['cfg']['nb_classes'],
                         n_frames=data['cfg']['nb_input_channels'])
+    elif cfg['model'] == 'pkcin4cwr_2d':
+        net = PKCIn4CWR2D(n_classes=data['cfg']['nb_classes'],
+                          n_frames=data['cfg']['nb_input_channels'])
     elif cfg['model'] == 'pkcin4cwr_dns':
         net = PKCIn4CWR_Dns(n_classes=data['cfg']['nb_classes'],
                             n_frames=data['cfg']['nb_input_channels'])
@@ -125,15 +128,16 @@ def main():
     torch.manual_seed(cfg['torch_seed'])
     net.apply(_init_weights)
 
-    net_without_ddp = net
     if args.distributed:
-        net = torch.nn.parallel.DistributedDataParallel(net, device_ids=[args.gpu])
-        net_without_ddp = net.module
+        net = torch.nn.parallel.DistributedDataParallel(net)
     
     if cfg['model'] in ['mvnet', 'fcn8s', 'unet', 'deeplabv3plus', 'kuradnet', 'kuradnet_wskip']:
         Model(net, data).train(add_temp=False)
     else:
         Model(net, data).train(add_temp=True)
+    
+    if args.distributed:
+        torch.distributed.destroy_process_group()
 
 def _init_weights(m):
     if isinstance(m, nn.Linear):
