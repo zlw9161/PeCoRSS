@@ -59,6 +59,7 @@ if prf_cuda_installed:
     # Peak Conv with fixed guard banwidth (gb) and dense reference receptive field (RRF)
     class PeakConv2D(nn.Module):
         def __init__(self, in_ch, out_ch, bias, refer_band, guard_band_dop, guard_band, signal_type):
+            print("use cuda PeakConv2D")
             """
             Args:
                 refer_band: a single integer value or integer vector of two values.
@@ -143,6 +144,7 @@ else:
     # Peak Conv with fixed guard banwidth (gb) and dense reference receptive field (RRF)
     class PeakConv2D(nn.Module):
         def __init__(self, in_ch, out_ch, bias, refer_band, guard_band_dop, guard_band, signal_type):
+            print("not use cuda peakconv2d")
             """
             Args:
                 refer_band: a single integer value or integer vector of two values.
