@@ -131,24 +131,23 @@ $ python set_paths.py --carrada /user_path/datasets/Carrada --cwr /user_path/dat
 
 ### Accelerating PeakConv (Optional)
 
->**Please Note**: This is optional for running this repo, however if you would like to use the faster version of PKC-based models, this step is requaired.
-1. Installing the cuda implementation of PRF gathering (infer version);
+>**Please Note**: This is optional for running this repo, however if you would like to use the faster version of PKC-based models, this step is required.
+
+Installing the cuda implementation of PRF gathering;
 
 ```bash
-$ cd PeCoLab/max_pooling
-$ python setup.py develop
-$ pip list # checking the installation of prf_div lib
+$ cd PeCoLab/PeCoRSS
+$ python setup.py develop --with-cuda
 ```
-2. The trainable version of PRF gathering is under development...
 
 #### Accelerating Effects
 
 | Model          | GPU Mem.  | GMac   | FPS   | Input Size     | #Params. |
 | -------------- | --------- | ------ | ----- | -------------- | -------- |
 | PKCIn4CWR      | 12007 MB  | 162.52 | 29.5  | 1,1,5,124,2048 | 1.21 M   |
-| PKCIn4CWR_CUDA | 5697 MB   | 162.52 | 63.7  | 1,1,5,124,2048 | 1.21 M   |
+| PKCIn4CWR(accelerated) | 5697 MB   | 162.52 | 63.7  | 1,1,5,124,2048 | 1.21 M   |
 | PKCIn4PDR      | 3007 MB   | 32.77  | 137.5 | 1,1,5,64,800   | 1.21 M   |
-| PKCIn4CWR_CUDA | 1761 MB   | 32.77  | 396.6 | 1,1,5,64,800   | 1.21 M   |
+| PKCIn4CWR((accelerated))| 1761 MB   | 32.77  | 396.6 | 1,1,5,64,800   | 1.21 M   |
 
 
 ### Training
