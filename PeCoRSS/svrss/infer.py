@@ -94,7 +94,18 @@ def test_model():
     saved_model = torch.load(model_path, map_location=torch.device('cpu'))
     if args.distributed and args.sync_bn:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-    model.load_state_dict(saved_model)
+
+    first_key = next(iter(saved_model))
+    from collections import OrderedDict
+    if first_key.startswith('module.'):
+        new_state_dict = OrderedDict()
+        for k, v in saved_model.items():
+            name = k[7:] if k.startswith('module.') else k  # 去除 'module.' 前缀
+            new_state_dict[name] = v
+        model.load_state_dict(new_state_dict)
+    else:
+        model.load_state_dict(saved_model)
+    
     model.to(device)
     if args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])

@@ -98,7 +98,8 @@ class Tester:
             # list_ori_idx2_ra = []
             # list_ori_idx1_ad = []
             # list_ori_idx2_ad = []
-            for i, sequence_data in enumerate(seq_loader):
+            from tqdm import tqdm
+            for i, sequence_data in enumerate(tqdm(seq_loader)):
                 # print('processing: {} / {}'.format(i, len(seq_loader)))
                 seq_name, seq = sequence_data
                 if self.dataset == 'CWRdata':
