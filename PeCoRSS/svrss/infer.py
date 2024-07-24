@@ -38,6 +38,15 @@ def test_model():
     path = paths['logs'] / cfg['dataset'] / cfg['model'] / exp_name
     model_path = path / 'results' / (cfg['model']+'.pt')
     test_results_path = path / 'results' / 'test_results.json'
+    
+    if cfg['dataset'] in ['CWRdata', 'Carrada_RA', 'Carrada_RD', 'CarradaRAC_RD', 'CarradaRAC_RA']:
+        cfg['nb_classes'] = 4
+    elif cfg['dataset'] == 'PDRdata':
+        cfg['nb_classes'] = 5
+    elif cfg['dataset'] == 'RDSyn':
+        cfg['nb_classes'] = 2
+    else:
+        raise KeyError('Dataset {} has not been supported yet.'.format(cfg['dataset']))
 
     if cfg['model'] == 'cwrnet':
         # loading parallel saved model in local single gpu mode
