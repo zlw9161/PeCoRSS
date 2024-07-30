@@ -316,7 +316,7 @@ class EncodingBranch(nn.Module):
         self.n_frames = n_frames
         self.double_3dconv_block1 = Double3DConvBlock(in_ch=1, out_ch=32, 
                                                       k_size=(1+n_frames//2, 3, 3),
-                                                      pad=(0, 1, 1), dil=1) # 首先进入一个3d卷积层，TODO：不知道是在什么维度上操作
+                                                      pad=(0, 1, 1), dil=1)
         self.doppler_max_pool = nn.MaxPool2d(2, stride=(1, 2))
         self.max_pool = nn.MaxPool2d(2, stride=2)
         # self.double_conv_block2 = DoubleConvBlock(in_ch=128, out_ch=128, k_size=3,
@@ -333,13 +333,13 @@ class EncodingBranch(nn.Module):
 
     def forward(self, x):
         x1 = self.double_3dconv_block1(x)
-        x1 = torch.squeeze(x1, 2)  # remove temporal dimension 是有时间维度的，删除了，TODO: 难道这部分输出后维度为1？
+        x1 = torch.squeeze(x1, 2)
 
-        x1_pad = F.pad(x1, (0, 0, 0, 0), "constant", 0) # 进行pad， 这是什么操作，TODO: 4个0？
+        x1_pad = F.pad(x1, (0, 0, 0, 0), "constant", 0)
         x1_down = self.max_pool(x1_pad)
 
-        x2 = self.double_pkc_block(x1_down) # 调用了pkc卷积块，TODO: 需要明确其卷积块
-        x2_pad = F.pad(x2, (0, 0, 0, 1), "constant", 0) # 这部分的pad是做什么， TODO: 是因为上面的卷积会改变输入张量形状吗
+        x2 = self.double_pkc_block(x1_down)
+        x2_pad = F.pad(x2, (0, 0, 0, 1), "constant", 0)
         x2_down = self.doppler_max_pool(x2_pad) # 
 
         x3 = self.single_conv_block1_1x1(x2_down)

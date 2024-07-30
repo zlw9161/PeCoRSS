@@ -21,3 +21,5 @@ from .tarssnet_v2_ra import TARSSNet_V2_RA
 from .deeplabv3plus import DeepLabV3Plus_Res101
 from .fcn8s import FCN8s
 from .unet import UNet
+from .pkcin4any import PKCIn4ANY
+from .pkcin4any_cuda import PKCIn4ANY_cuda

@@ -6,7 +6,7 @@ from pathlib import Path
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
-from svrss.loaders.dataset import CWRdata
+from svrss.loaders.dataset import CWRdata, XPDdata
 from svrss.utils.paths import Paths
 
 
@@ -130,10 +130,14 @@ class PeCoRSVDataset(Dataset):
                     rd_matrix = np.load(os.path.join(self.path_to_frames,
                                                     self.signal_type + '_raw',
                                                     frame_name + '.npy'))
+            elif self.dataset_type == 'XPDdata':
+                rd_matrix = np.load(os.path.join(self.path_to_frames,
+                                                 self.signal_type + '_mtdData_amp',
+                                                 frame_name + '.npy'))
             else:
                 rd_matrix = np.load(os.path.join(self.path_to_frames,
-                                                self.signal_type + '_numpy',
-                                                frame_name + '.npy'))
+                                                 self.signal_type + '_numpy',
+                                                 frame_name + '.npy'))
 
             rd_matrices.append(rd_matrix)
             # ra_matrices.append(ra_matrix)
@@ -264,17 +268,19 @@ def test_sequence():
             break
 
 
-def test_CWRdataset():
+def test_XPDdata():
     paths = Paths().get()
     n_frames = 3
-    dataset = CWRdata().get('Train')
+    dataset = XPDdata().get('Train')
     seq_dataloader = DataLoader(SequenceDataset(dataset), batch_size=1,
                                 shuffle=True, num_workers=0)
     for _, data in enumerate(seq_dataloader):
         seq_name, seq = data
-        path_to_frames = paths['CWRdata'] / seq_name[0]
+        path_to_frames = paths['XPDdata'] / seq_name[0]
         frame_dataloader = DataLoader(PeCoRSVDataset(seq,
+                                                     'XPDdata',
                                                      'dense',
+                                                     'range_doppler',
                                                      path_to_frames,
                                                      process_signal=True,
                                                      n_frames=n_frames),
@@ -282,11 +288,13 @@ def test_CWRdataset():
                                       batch_size=1,
                                       num_workers=0)
         for _, frame in enumerate(frame_dataloader):
-            assert list(frame['rd_matrix'].shape[2:]) == [124, 2048]
+            assert list(frame['rd_matrix'].shape[2:]) == [64, 148]
+            print(frame['rd_matrix'].shape)
             # assert list(frame['ra_matrix'].shape[2:]) == [256, 256]
             # assert list(frame['ad_matrix'].shape[2:]) == [256, 64]
             assert frame['rd_matrix'].shape[1] == n_frames
-            assert list(frame['rd_mask'].shape[2:]) == [124, 2048]
+            assert list(frame['rd_mask'].shape[2:]) == [64, 148]
+            print(frame['rd_mask'].shape)
             # assert list(frame['ra_mask'].shape[2:]) == [256, 256]
         break
 
@@ -326,5 +334,5 @@ def test_subflip():
     
 if __name__ == '__main__':
     #test_sequence()
-    # test_CWRdataset()
-    test_subflip()
+    test_XPDdata()
+    #test_subflip()
