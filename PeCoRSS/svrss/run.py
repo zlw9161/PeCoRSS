@@ -123,7 +123,10 @@ def main():
         saved_model = torch.load(args.finetune, map_location=torch.device('cpu'))
         net.load_state_dict(saved_model)
     
-    net.to(device)
+    if args.distributed:
+        net.to('cuda')
+    else:
+        net.to(device)
     # # lt @20230522 fix random seed
     torch.manual_seed(cfg['torch_seed'])
     net.apply(_init_weights)
