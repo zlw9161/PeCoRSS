@@ -13,6 +13,8 @@ if __name__ == '__main__':
                         help='Path to the Carrada dataset.')
     parser.add_argument('--rdsyn', default='/data/PeCoLab/DataSets/RDSyn',
                         help='Path to the synthesis radar dataset.')
+    parser.add_argument('--xpd', default='/home/liwenzhang/PeCoLab/DataSets/XPDData/S70-20240717-npy',
+                        help='Path to the synthesis radar dataset.')
     parser.add_argument('--logs', default='/data/PeCoLab/logs',
                         help='Path to the save the logs and models.')
     args = parser.parse_args()
@@ -22,6 +24,7 @@ if __name__ == '__main__':
     configurable.set('data', 'pdr', args.pdr)
     configurable.set('data', 'carrada', args.carrada)
     configurable.set('data', 'rdsyn', args.rdsyn)
+    configurable.set('data', 'xpd', args.xpd)
     configurable.set('data', 'logs', args.logs)
     with open(config_path, 'w') as fp:
         configurable.config.write(fp)
