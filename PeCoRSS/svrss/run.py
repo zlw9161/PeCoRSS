@@ -7,7 +7,7 @@ from svrss.learners.model import Model
 from svrss.models import CWRNet, PKCIn4CWR, PKCIn4CWR2D, PKCIn4CWR_Dns, TARSS4CWR_V1, TARSS4CWR_V2
 from svrss.models import KuRADNet, KuRADNet_WSkip, PKCIn4PDR, PKCIn4PDR_Dns, TARSS4PDR_V1, TARSS4PDR_V2
 from svrss.models import BaseLine3D, TARSSNet_V1_RD, TARSSNet_V1_RA, TARSSNet_V2_RD, TARSSNet_V2_RA
-from svrss.models import UNet, FCN8s, DeepLabV3Plus_Res101
+from svrss.models import UNet, FCN8s, DeepLabV3Plus_Res101, PKCIn4ANY, PKCIn4ANY_cuda
 import torch.nn as nn
 import torch
 from svrss.utils.distributed_utils import init_distributed_mode
@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--cfg', help='Path to config file.', default='config.json', type=str, required=True)
     parser.add_argument('--dataset', default='Carrada_RD', help='dataset for model training,\
-                        options: Carrada_RD, Carrada_RA, CarradaRAC_RD, CarradaRAC_RA, CWRdata, PDRdata, RDSyn', type=str)
+                        options: Carrada_RD, Carrada_RA, CarradaRAC_RD, CarradaRAC_RA, CWRdata, PDRdata, RDSyn, XPDdata', type=str)
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
     parser.add_argument('--sync-bn', dest='sync_bn', help='Use sync batch norm', action='store_true')
     parser.add_argument('--finetune', help='the finetune path of model', action='store_true')
@@ -33,7 +33,7 @@ def main():
         cfg['nb_classes'] = 4
     elif cfg['dataset'] == 'PDRdata':
         cfg['nb_classes'] = 5
-    elif cfg['dataset'] == 'RDSyn':
+    elif cfg['dataset'] == 'XPDdata':
         cfg['nb_classes'] = 2
     else:
         raise KeyError('Dataset {} has not been supported yet.'.format(cfg['dataset']))
@@ -80,6 +80,16 @@ def main():
     elif cfg['model'] == 'tarss4pdr_v2':
         net = TARSS4PDR_V2(n_classes=data['cfg']['nb_classes'],
                            n_frames=data['cfg']['nb_input_channels'])
+    elif cfg['model'] == 'pkcin4any':
+        net = PKCIn4ANY(n_classes=data['cfg']['nb_classes'],
+                        n_frames=data['cfg']['nb_input_channels'],
+                        w=data['cfg']['w_size'],
+                        h=data['cfg']['h_size'])
+    elif cfg['model'] == 'pkcin4any_cuda':
+        net = PKCIn4ANY_cuda(n_classes=data['cfg']['nb_classes'],
+                             n_frames=data['cfg']['nb_input_channels'],
+                             w=data['cfg']['w_size'],
+                             h=data['cfg']['h_size'])
     elif cfg['model'] == 'baseline3d':
         if cfg['dataset'] in ['CarradaRAC_RA', 'Carrada_RA']:
             net = BaseLine3D(n_classes=data['cfg']['nb_classes'],

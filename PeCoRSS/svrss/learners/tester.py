@@ -73,7 +73,7 @@ class Tester:
         if self.dataset in ['Carrada_RA', 'CarradaRAC_RA']:
             signal_type = 'range_angle'
             criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device)
-        elif self.dataset in ['CWRdata', 'PDRdata', 'Carrada_RD', 'CarradaRAC_RD']:
+        elif self.dataset in ['CWRdata', 'PDRdata', 'Carrada_RD', 'CarradaRAC_RD', 'XPDdata']:
             signal_type = 'range_doppler'
             criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device)
         else:
@@ -106,6 +106,8 @@ class Tester:
                     path_to_frames = self.paths['CWRdata'] / seq_name[0]
                 elif self.dataset == 'PDRdata':
                     path_to_frames = self.paths['PDRdata'] / seq_name[0]
+                elif self.dataset == 'XPDdata':
+                    path_to_frames = self.paths['XPDdata'] / seq_name[0]
                 elif self.dataset in ['Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD']:
                     path_to_frames = self.paths['Carrada'] / seq_name[0]
                 else:
@@ -125,7 +127,7 @@ class Tester:
                 else:
                     sampler_test = torch.utils.data.SequentialSampler(_dataset)
                 # lt@20240301 for pdr dataset, fix batch size to 2.
-                if self.dataset in ['CWRdata', 'Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD']:
+                if self.dataset in ['CWRdata', 'Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD', 'XPDdata']:
                     frame_dataloader = DataLoader(_dataset,
                                                   shuffle=False,
                                                   sampler=sampler_test,

@@ -7,11 +7,11 @@ from torch.utils.data import DataLoader
 from svrss.utils.paths import Paths
 from svrss.utils.functions import count_params
 from svrss.learners.tester import Tester
-from svrss.loaders.dataset import Carrada, PDRdata, CWRdata, RDSyn
+from svrss.loaders.dataset import Carrada, PDRdata, CWRdata, RDSyn, XPDdata
 from svrss.models import CWRNet, PKCIn4CWR, PKCIn4CWR_Dns, TARSS4CWR_V1, TARSS4CWR_V2
 from svrss.models import KuRADNet, KuRADNet_WSkip, PKCIn4PDR, PKCIn4PDR_Dns, TARSS4PDR_V1, TARSS4PDR_V2
 from svrss.models import BaseLine3D, TARSSNet_V1_RD, TARSSNet_V1_RA, TARSSNet_V2_RD, TARSSNet_V2_RA
-from svrss.models import UNet, FCN8s, DeepLabV3Plus_Res101
+from svrss.models import UNet, FCN8s, DeepLabV3Plus_Res101, PKCIn4ANY
 from svrss.loaders.dataloaders import SequenceDataset
 from svrss.utils.distributed_utils import init_distributed_mode
 
@@ -94,6 +94,11 @@ def test_model():
         model = FCN8s(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
     elif cfg['model'] == 'deeplabv3plus':
         model = DeepLabV3Plus_Res101(n_classes=cfg['nb_classes'], n_frames=cfg['nb_input_channels'])
+    elif cfg['model'] == 'pkcin4any':
+        model = PKCIn4ANY(n_classes=cfg['nb_classes'],
+                          n_frames=cfg['nb_input_channels'],
+                          w=cfg['w_size'],
+                          h=cfg['h_size'])
     else:
         raise ValueError('model {} is not supported in infer.py yet.'.format(cfg['model']))
     
@@ -130,7 +135,9 @@ def test_model():
         data = PDRdata()
     elif cfg['dataset'] == 'RDSyn':
         data = RDSyn()
-    test = data.get('Train')
+    elif cfg['dataset'] == 'XPDdata':
+        data = XPDdata()
+    test = data.get('Test')
     testset = SequenceDataset(test)
     seq_testloader = DataLoader(testset, batch_size=1, shuffle=False, num_workers=0)
     tester.set_annot_type(cfg['annot_type'])

@@ -162,6 +162,8 @@ def normalize(data, dataset_type, signal_type, norm_type='local'):
         file_name = 'cwr'
     elif dataset_type == 'PDRdata':
         file_name = 'pdr'
+    elif dataset_type == 'XPDdata':
+        file_name = 'xpd'
     elif dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
         file_name = 'carrada'
     else:
@@ -414,6 +416,8 @@ def get_qualitatives(outputs, masks, paths, seq_name, quali_iter, signal_type=No
         num_class = 4
     elif dataset_type == 'PDRdata':
         num_class = 5
+    elif dataset_type == 'XPDdata':
+        num_class = 2
     else:
         raise KeyError(f'Dataset {dataset_type} has not been supported yet.')
     

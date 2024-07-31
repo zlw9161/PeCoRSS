@@ -3,7 +3,7 @@ import json
 from torch.utils.data import DataLoader
 
 from svrss.utils.paths import Paths
-from svrss.loaders.dataset import CWRdata, PDRdata, Carrada, RDSyn
+from svrss.loaders.dataset import CWRdata, PDRdata, Carrada, RDSyn, XPDdata
 from svrss.loaders.dataloaders import SequenceDataset
 from svrss.utils.distributed_utils import get_rank
 import time
@@ -31,6 +31,8 @@ class Initializer:
             data = Carrada()
         elif self.cfg['dataset'] == 'RDSyn':
             data = RDSyn()
+        elif self.cfg['dataset'] == 'XPDdata':
+            data = XPDdata()
         else:
             raise KeyError('Dataset {} has not been supported yet.'.format(self.cfg['dataset']))
         

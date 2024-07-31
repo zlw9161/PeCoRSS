@@ -16,7 +16,7 @@ from svrss.utils.tensorboard_visualizer import TensorboardMultiLossVisualizer
 from svrss.utils.distributed_utils import get_rank, reduce_value
 import random
 import time
-from tqdm import tqdm
+# from tqdm import tqdm
 
 
 class Model(nn.Module):
@@ -90,7 +90,7 @@ class Model(nn.Module):
                                               sizes=(self.w_size, self.h_size))
         self._set_seeds()
         # self.net.module.apply(self._init_weights)
-        if self.dataset in ['CWRdata', 'PDRdata', 'Carrada_RD', 'CarradaRAC_RD']:
+        if self.dataset in ['CWRdata', 'PDRdata', 'Carrada_RD', 'CarradaRAC_RD', 'XPDdata']:
             signal_type = 'range_doppler'
             criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device)
         elif self.dataset in ['Carrada_RA', 'CarradaRAC_RA']:
@@ -138,12 +138,15 @@ class Model(nn.Module):
             else:
                 if epoch != 0 and epoch < self.T_max:
                     scheduler.step()
-            for _, sequence_data in enumerate(tqdm(train_loader)):
+            # for _, sequence_data in enumerate(tqdm(train_loader)):
+            for _, sequence_data in enumerate(train_loader):
                 seq_name, seq = sequence_data
                 if self.dataset == 'CWRdata':
                     path_to_frames = self.paths['CWRdata'] / seq_name[0]
                 elif self.dataset == 'PDRdata':
                     path_to_frames = self.paths['PDRdata'] / seq_name[0]
+                elif self.dataset == 'XPDdata':
+                    path_to_frames = self.paths['XPDdata'] / seq_name[0]
                 elif self.dataset in ['Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD']:
                     path_to_frames = self.paths['Carrada'] / seq_name[0]
                 else:

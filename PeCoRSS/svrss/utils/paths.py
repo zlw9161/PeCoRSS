@@ -20,6 +20,7 @@ class Paths(Configurable):
         self.paths['PDRdata'] = Path(self.config['data']['pdr'])
         self.paths['Carrada'] = Path(self.config['data']['carrada'])
         self.paths['RDSyn'] = Path(self.config['data']['rdsyn'])
+        self.paths['XPDdata'] = Path(self.config['data']['xpd'])
 
     def get(self):
         return self.paths
