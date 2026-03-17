@@ -1,4 +1,16 @@
-__pycache__
-*.pyc
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE/editor metadata
+.idea/
+.vscode/
+
+# Model checkpoints
 *.pt
 .vscode
