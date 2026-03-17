@@ -1,0 +1,10 @@
+2024.08.02
+RDSyn Support
+1. adding "split_type" into "RDSyn" class: svrss/loaders/dataset.py
+2. adding "rd17" file name into "RDSyn" dataset_type: svrss/utils/functions.py
+3. adding "RDSyn" support: svrss/run.py
+4. adding "RDSyn" support: svrss/learners/model.py
+
+CFAR testing
+1. adding cfar detector: svrss/utils/Detector.py
+2. adding learners/tester_cfar.py
