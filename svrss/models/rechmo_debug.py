@@ -11,6 +11,11 @@ from svrss.models import PKCIn4ANY
 import os
 
 
+def _freeze_module(module):
+    for p in module.parameters():
+        p.requires_grad = False
+
+
 def _init_translator_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.xavier_uniform_(m.weight)
@@ -34,16 +39,15 @@ class Leanable_Match_FilterV5(nn.Module):
         self.mf = lmf_coef.view(1, 1, 1, self.k_size)
         self.activation = activation
         self.bias = bias
-        self.kernel_real, self.kernel_imag = self.init_kernels()
-        self.lmf_real = nn.Conv2d(self.in_ch, self.out_ch,
-                                  kernel_size=(1, k_size), stride=(1, 1),
-                                  bias=self.bias)
-        self.lmf_imag = nn.Conv2d(self.in_ch, self.out_ch,
-                                  kernel_size=(1, k_size), stride=(1, 1),
-                                  bias=self.bias)
-        with torch.no_grad():
-            self.lmf_real.weight.data = self.kernel_real
-            self.lmf_imag.weight.data = self.kernel_imag
+        kernel_real, kernel_imag = self.init_kernels()
+        self.kernel_real = nn.Parameter(kernel_real)
+        self.kernel_imag = nn.Parameter(kernel_imag)
+        if self.bias:
+            self.bias_real = nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+            self.bias_imag = nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+        else:
+            self.register_parameter('bias_real', None)
+            self.register_parameter('bias_imag', None)
 
         # causule conv only padding one side
         self.cause_padding = torch.nn.ZeroPad2d(padding=(0, self.k_size - 1, 0, 0))
@@ -56,8 +60,6 @@ class Leanable_Match_FilterV5(nn.Module):
         imag_kernel = self.mf.imag
         real_kernel = real_kernel.broadcast_to(self.out_ch, self.in_ch, 1, self.k_size)
         imag_kernel = imag_kernel.broadcast_to(self.out_ch, self.in_ch, 1, self.k_size)
-        real_kernel = nn.Parameter(real_kernel)
-        imag_kernel = nn.Parameter(imag_kernel)
         return real_kernel, imag_kernel
 
     # input: (B, C, numRange, numPulse) --> (B, C, numRange + k_size - 1, numPulse)
@@ -65,10 +67,10 @@ class Leanable_Match_FilterV5(nn.Module):
         # x_echo = x
         inputR = self.cause_padding(x.real)
         inputI = self.cause_padding(x.imag)
-        x_RR = self.lmf_real(inputR)
-        x_II = self.lmf_imag(inputI)
-        x_RI = self.lmf_imag(inputR)
-        x_IR = self.lmf_real(inputI)
+        x_RR = F.conv2d(inputR, self.kernel_real, self.bias_real, stride=(1, 1), padding=0)
+        x_II = F.conv2d(inputI, self.kernel_imag, self.bias_imag, stride=(1, 1), padding=0)
+        x_RI = F.conv2d(inputR, self.kernel_imag, self.bias_imag, stride=(1, 1), padding=0)
+        x_IR = F.conv2d(inputI, self.kernel_real, self.bias_real, stride=(1, 1), padding=0)
         x = x_RR - x_II + 1j * (x_RI + x_IR)
 
         # import matplotlib.pyplot as plt
@@ -115,6 +117,8 @@ class LMF_Chain(nn.Module):
                                                                 activation=None,
                                                                 bias=False))
             self.in_ch = configs.lmf_channels
+
+        _freeze_module(self.FrozenChain)
 
     def forward(self, x):
         with torch.no_grad():
@@ -228,19 +232,17 @@ class Group_Purturble_DF(nn.Module):
         self.groups = groups
         self.activation = activation
         self.bias = bias
+        self.stride = (k_size, 1)
         # self.doppler_padding = torch.nn.ZeroPad2d(padding=(self.k_size-n_pulse, 0, 0, 0))
-        self.cos_kernel, self.sin_kernel = self.init_fourier_kernels()
-        self.gdf_cos = nn.Conv2d(self.in_ch*self.groups, self.out_ch*self.groups,
-                                 kernel_size=(k_size, 1), stride=(k_size, 1),
-                                 padding=0, groups=self.groups,
-                                 bias=self.bias)
-        self.gdf_sin = nn.Conv2d(self.in_ch*self.groups, self.out_ch*self.groups,
-                                 kernel_size=(k_size, 1), stride=(k_size, 1),
-                                 padding=0, groups=self.groups,
-                                 bias=self.bias)
-        with torch.no_grad():
-            self.gdf_cos.weight.data = self.cos_kernel.cuda()
-            self.gdf_sin.weight.data = self.sin_kernel.cuda()
+        cos_kernel, sin_kernel = self.init_fourier_kernels()
+        self.cos_kernel = nn.Parameter(cos_kernel)
+        self.sin_kernel = nn.Parameter(sin_kernel)
+        if self.bias:
+            self.cos_bias = nn.Parameter(torch.zeros(self.out_ch * self.groups, dtype=torch.float32))
+            self.sin_bias = nn.Parameter(torch.zeros(self.out_ch * self.groups, dtype=torch.float32))
+        else:
+            self.register_parameter('cos_bias', None)
+            self.register_parameter('sin_bias', None)
         # self.batch_norm = ComplexBatchNorm2d(num_features=self.out_ch*self.groups)
         self.cmplx_relu = ComplexReLU(self.activation)
 
@@ -262,8 +264,6 @@ class Group_Purturble_DF(nn.Module):
                                         (self.groups, self.out_ch, self.in_ch, self.k_size, 1))
         cos_kernel = cos_kernel.reshape(self.out_ch*self.groups, self.in_ch, self.k_size, 1)
         sin_kernel = sin_kernel.reshape(self.out_ch*self.groups, self.in_ch, self.k_size, 1)
-        cos_kernel = nn.Parameter(cos_kernel)
-        sin_kernel = nn.Parameter(sin_kernel)
         return cos_kernel, sin_kernel
 
     # input: (B, C, numPulse, numRange) --> (B, C, numDoppler, numRange)
@@ -273,10 +273,10 @@ class Group_Purturble_DF(nn.Module):
         B, R = x.shape[0], x.shape[3]
         x_real, x_imag = x.real.cuda(), x.imag.cuda()
         # x_real, x_imag = x.real, x.imag
-        x_rr = self.gdf_cos(x_real)
-        x_ii = self.gdf_sin(x_imag)
-        x_ri = self.gdf_sin(x_real)
-        x_ir = self.gdf_cos(x_imag)
+        x_rr = F.conv2d(x_real, self.cos_kernel, self.cos_bias, stride=self.stride, padding=0, groups=self.groups)
+        x_ii = F.conv2d(x_imag, self.sin_kernel, self.sin_bias, stride=self.stride, padding=0, groups=self.groups)
+        x_ri = F.conv2d(x_real, self.sin_kernel, self.sin_bias, stride=self.stride, padding=0, groups=self.groups)
+        x_ir = F.conv2d(x_imag, self.cos_kernel, self.cos_bias, stride=self.stride, padding=0, groups=self.groups)
         x = x_rr + x_ii - 1j * x_ri + 1j * x_ir
         # x = self.batch_norm(x)
         x = self.cmplx_relu(x)
@@ -334,6 +334,9 @@ class rEchMo(nn.Module):
                                             groups=self.df_groups,
                                             activation=self.activation,
                                             bias=self.bias)                              
+        _freeze_module(self.FrozenMLDC)
+        _freeze_module(self.FrozenGDF)
+
         self.RDTranslator = PKCIn4ANY(n_classes=self.n_classes,
                                       n_frames=self.n_frames,
                                       in_ch=self.df_groups,

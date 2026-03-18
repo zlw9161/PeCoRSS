@@ -48,7 +48,7 @@ def main():
     model_cfg = EchMo_CFG()
     model_cfg.task_name = data['cfg']['task_name']
     model_cfg.coef_path = 'coefs'
-    model_cfg.dataset_path = '/media/liwenzhang/Data2/DataSets/NuaaSim'
+    model_cfg.dataset_path = '/data/PeCoLab/datasets/NuaaSim'
     # data setting
     model_cfg.n_pulse = data['cfg']['w_size']
     model_cfg.n_range = data['cfg']['h_size']
@@ -87,6 +87,10 @@ def main():
         if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear) or isinstance(module, nn.Parameter) or isinstance(module, nn.Conv3d):
             param_count = sum(p.numel() for p in module.parameters() if p.requires_grad)
             print(f"Layer: {name}, #Params: {param_count}")
+    # Also show trainable tensors that are registered as raw Parameters (not inside Conv/Linear modules). @20260318
+    for name, param in net.named_parameters():
+        if param.requires_grad and (name.startswith('LMFChain') or name.startswith('GDF')):
+            print(f"Param: {name}, #Params: {param.numel()}")
     total_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print(f">>>>>Total #Params in Model: {total_params}")
     from thop import profile

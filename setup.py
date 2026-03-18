@@ -2,6 +2,8 @@ from setuptools import setup
 from setuptools import find_packages
 
 import sys
+import os
+import shutil
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 from distutils.core import Distribution
 from distutils.command.install import install
@@ -37,10 +39,19 @@ class PeCoRSSBuildExtCommand(BuildExtension):
 def get_extensions(with_cuda):
     extensions = []
     if with_cuda:
+        # CUDA 12.x + some PyTorch builds can fail with newer host GCC (e.g. 13).
+        # Prefer g++-11 when available; users can override via CUDAHOSTCXX/CC/CXX.
+        nvcc_args = []
+        if not os.environ.get("CUDAHOSTCXX"):
+            gcc11 = shutil.which("g++-11")
+            if gcc11:
+                nvcc_args.append(f"--compiler-bindir={gcc11}")
+
         extensions.append(
             CUDAExtension(
                 name="prf_cuda",
                 sources=["svrss/extension/prf_cuda_ops.cpp", "svrss/extension/prf_cuda.cu"],
+                extra_compile_args={"nvcc": nvcc_args},
             )
         )
     return extensions
@@ -49,18 +60,22 @@ def has_cuda_option():
     return '--with-cuda' in sys.argv
 
 setup(name='pecorss',
-      version='1.3',
+      version='1.0.2',
       author=['Liwen Zhang',
               'Youcheng Zhang',
               'Xinyan Zhang',
               'Teng Li',
-              'Jinlong Li'],
+              'Jinlong Li',
+              'Zijun Hu',
+              'Xinying Fu'],
       author_email='lwzhang9161@126.com',
       maintainer=['Liwen Zhang',
                   'Youcheng Zhang',
                   'Xinyan Zhang',
                   'Teng Li',
-                  'Jinlong Li'],
+                  'Jinlong Li',
+                  'Zijun Hu',
+                  'Xinying Fu'],
       maintainer_email='lwzhang9161@126.com',
       url='https://github.com/zlw9161',
       license='Apache 2.0',

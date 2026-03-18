@@ -3,7 +3,7 @@
  * cuda speed up
  */
 #include <stdio.h>
-#include <torch/torch.h>
+#include <torch/extension.h>
 #include <ATen/ATen.h>
 #include <vector>
 #include <algorithm>

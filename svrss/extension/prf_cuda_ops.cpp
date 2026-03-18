@@ -4,7 +4,6 @@
  */
 
 #include <torch/extension.h>
-#include <torch/torch.h>
 #include <ATen/ATen.h>
 
 torch::Tensor prf_forward(
