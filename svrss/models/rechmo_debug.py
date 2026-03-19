@@ -138,17 +138,16 @@ class Multi_Order_LDC(nn.Module):
         self.bias = bias
         self.hp_coefs = self.get_highpass_coefs()
         self.hp_kernels = self.init_highpass_kernels()
-        self.ldc_list = nn.ModuleList()
         self.pad_list = nn.ModuleList()
+        if self.bias:
+            self.hp_biases = nn.ParameterList([
+                nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+                for _ in range(self.orders)
+            ])
+        else:
+            self.hp_biases = None
         for n in range(self.orders):
-            ldc = nn.Conv2d(self.in_ch, self.out_ch, 
-                            kernel_size=(n+2, 1),
-                            bias=self.bias)
             pad = torch.nn.ZeroPad2d(padding=(0, 0, n+1, 0))
-            self.in_ch = self.out_ch
-            with torch.no_grad():
-                ldc.weight.data = self.hp_kernels[n]
-            self.ldc_list.append(ldc)
             self.pad_list.append(pad)
         # self.batch_norm = ComplexBatchNorm2d(num_features=self.orders*self.out_ch)
         self.cmplx_relu = ComplexReLU(self.activation)
@@ -170,13 +169,13 @@ class Multi_Order_LDC(nn.Module):
         return hp_coefs
         
     def init_highpass_kernels(self):
-        hp_kernels = []
+        hp_kernels = nn.ParameterList()
         for n in range(len(self.hp_coefs)):
             hp_kernels_n = self.hp_coefs[n].unsqueeze(dim=0).unsqueeze(dim=0).broadcast_to(self.out_ch,
                                                                                            self.in_ch,
                                                                                            n+2,
                                                                                            1)
-            hp_kernels.append(nn.Parameter(hp_kernels_n))
+            hp_kernels.append(nn.Parameter(hp_kernels_n.clone().contiguous()))
         return hp_kernels
     
     def forward(self, x):
@@ -185,11 +184,23 @@ class Multi_Order_LDC(nn.Module):
         B, P, R = x.shape[0], x.shape[2], x.shape[3]
         x = x.unsqueeze(dim=1).broadcast_to(B, self.orders, 
                                             x.shape[1], P, R)
-        y_r = torch.zeros(B, self.orders, self.out_ch, P, R).cuda()
-        y_i = torch.zeros(B, self.orders, self.out_ch, P, R).cuda()
+        # 20250807
+        # y_r = torch.zeros(B, self.orders, self.out_ch, P, R).cuda()
+        # y_i = torch.zeros(B, self.orders, self.out_ch, P, R).cuda()
+        y_r = torch.zeros(B, self.orders, self.out_ch, P, R).to(x.device)
+        y_i = torch.zeros(B, self.orders, self.out_ch, P, R).to(x.device)
         for n in range(self.orders):
-            x_n_real = self.ldc_list[n](self.pad_list[n](x[:,n,...].real))
-            x_n_imag = self.ldc_list[n](self.pad_list[n](x[:,n,...].imag))
+            bias = self.hp_biases[n] if self.bias else None
+            x_n_real = F.conv2d(self.pad_list[n](x[:, n, ...].real),
+                                self.hp_kernels[n],
+                                bias=bias,
+                                stride=(1, 1),
+                                padding=0)
+            x_n_imag = F.conv2d(self.pad_list[n](x[:, n, ...].imag),
+                                self.hp_kernels[n],
+                                bias=bias,
+                                stride=(1, 1),
+                                padding=0)
             y_r[:,n,...] = x_n_real
             y_i[:,n,...] = x_n_imag # x_n_real + 1j * x_n_imag
 
@@ -211,9 +222,11 @@ class Multi_Order_LDC(nn.Module):
         y_r = y_r.view(B, self.orders*self.out_ch, P, R)
         y_i = y_i.view(B, self.orders*self.out_ch, P, R)
         y = torch.complex(y_r, y_i)
+        # y = self.batch_norm(y)
         y = self.cmplx_relu(y)
         return y
               
+
 
 class Group_Purturble_DF(nn.Module):
     # Group-purturble Doppler filters (GDF)

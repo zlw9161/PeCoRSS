@@ -391,7 +391,7 @@ Please first clone or download the repo from [[PeCoRSS]](https://github.com/zlw9
 ### Step 1 — Install base library
 
 ```bash
-cd PeCoLab/PeCoRSS
+cd PeCoRSS
 pip install -e .
 ```
 
@@ -407,7 +407,7 @@ pip install tensorboard
 > This step is optional. It is only required for CUDA-accelerated PKC-based models.
 
 ```bash
-cd PeCoLab/PeCoRSS
+cd PeCoRSS
 python setup.py develop --with-cuda
 ```
 
@@ -625,7 +625,7 @@ If you find PeCoRSS useful in your research, please consider citing the followin
 | Field | Info |
 |:------|:-----|
 | **Package** | `pecorss` |
-| **Version** | `1.3` |
+| **Version** | `1.0.3` |
 | **License** | Apache 2.0 |
 | **Repository** | [https://github.com/zlw9161](https://github.com/zlw9161) |
 | **Contact** | lwzhang9161@126.com |

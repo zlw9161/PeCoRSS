@@ -89,7 +89,7 @@ def main():
             print(f"Layer: {name}, #Params: {param_count}")
     # Also show trainable tensors that are registered as raw Parameters (not inside Conv/Linear modules). @20260318
     for name, param in net.named_parameters():
-        if param.requires_grad and (name.startswith('LMFChain') or name.startswith('GDF')):
+        if param.requires_grad and (name.startswith('LMFChain') or name.startswith('MLDC') or name.startswith('GDF')):
             print(f"Param: {name}, #Params: {param.numel()}")
     total_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print(f">>>>>Total #Params in Model: {total_params}")
