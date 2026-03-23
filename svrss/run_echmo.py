@@ -2,6 +2,7 @@
 # End-to-end RSS network runing script
 # Echo in Mask out: EchMo zlw@20250317
 import argparse
+import importlib
 import json
 from svrss.utils.functions import count_params
 from svrss.learners.initializer import Initializer
@@ -9,7 +10,7 @@ from svrss.learners.model import Model
 from svrss.models import EchMo, rEchMo
 import torch.nn as nn
 import torch
-from svrss.utils.distributed_utils import init_distributed_mode
+from svrss.utils.distributed_utils import init_distributed_mode, get_rank, get_world_size
 
 
 def main():
@@ -20,6 +21,7 @@ def main():
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
     parser.add_argument('--sync-bn', dest='sync_bn', help='Use sync batch norm', action='store_true')
     parser.add_argument('--finetune', help='the finetune path of model', action='store_true')
+    parser.add_argument('--profile', action='store_true', help='Run THOP FLOPs profiling before training')
     args = parser.parse_args()
 
     init_distributed_mode(args)
@@ -28,6 +30,10 @@ def main():
         cfg = json.load(fp)
     device = torch.device(cfg['device'])
     cfg['distributed'] = args.distributed
+    if args.profile and args.distributed and get_world_size() > 1:
+        if get_rank() == 0:
+            print('[Profile] Disabled in DDP mode to avoid rank desync/timeout. Use single-process run for profiling.')
+        args.profile = False
     if cfg['dataset'] in ['CWRdata', 'Carrada_RA', 'Carrada_RD', 'CarradaRAC_RD', 'CarradaRAC_RA']:
         cfg['nb_classes'] = 4
     elif cfg['dataset'] == 'PDRdata':
@@ -93,13 +99,18 @@ def main():
             print(f"Param: {name}, #Params: {param.numel()}")
     total_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print(f">>>>>Total #Params in Model: {total_params}")
-    from thop import profile
-    if add_temp:
-        dummy_input = torch.randn(data['cfg']['batch_size'], 1, model_cfg.n_frames, model_cfg.n_pulse, model_cfg.n_range)
-    else:
-        dummy_input = torch.randn(data['cfg']['batch_size'], 1, model_cfg.n_pulse, model_cfg.n_range)
-    flops, _ = profile(net.cuda(), inputs=(torch.complex(dummy_input, dummy_input).cuda(),))
-    print(f">>>>>Model Computing Cosuming (FLOPs): {flops}")
+    if args.profile and get_rank() == 0:
+        profile = importlib.import_module('thop').profile
+
+        if add_temp:
+            dummy_input = torch.randn(1, 1, model_cfg.n_frames, model_cfg.n_pulse, model_cfg.n_range)
+        else:
+            dummy_input = torch.randn(1, 1, model_cfg.n_pulse, model_cfg.n_range)
+        flops, _ = profile(net.cuda(), inputs=(torch.complex(dummy_input, dummy_input).cuda(),))
+        print(f">>>>>Model Computing Cosuming (FLOPs) per Sample: {flops}")
+    if args.distributed:
+        # Keep all ranks aligned after rank0-only setup such as THOP profiling.
+        torch.distributed.barrier()
     print('----------------------')
 
     if args.distributed and args.sync_bn:

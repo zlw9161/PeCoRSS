@@ -4,7 +4,7 @@
 
 **Developed by PeCoLab of ISTA@CASIC**
 
-[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
+[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![Version](https://img.shields.io/badge/Version-1.0.4-brightgreen.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
 
 </div>
 
@@ -25,6 +25,7 @@
 - [Citation](#-citation)
 - [Acknowledgements](#-acknowledgements)
 - [Package Info](#-package-info)
+- [Changelog](#-changelog)
 - [License](#-license)
 
 ---
@@ -625,7 +626,7 @@ If you find PeCoRSS useful in your research, please consider citing the followin
 | Field | Info |
 |:------|:-----|
 | **Package** | `pecorss` |
-| **Version** | `1.0.3` |
+| **Version** | `1.0.4` |
 | **License** | Apache 2.0 |
 | **Repository** | [https://github.com/zlw9161](https://github.com/zlw9161) |
 | **Contact** | lwzhang9161@126.com |
@@ -638,8 +639,37 @@ PeCoRSS is released under the [Apache 2.0 License](LICENSE).
 
 ---
 
+## 📜 Changelog
+
+For detailed release notes and version history, see [CHANGELOG.md](./CHANGELOG.md).
+
+---
+
 <div align="center">
 
 **⭐ Star us on GitHub — it motivates us a lot!**
 
 </div>
+
+---
+
+## 📝 Update Log (v1.0.4)
+
+### AMP and Profile Decisions
+
+- We evaluated AMP-BF16 and AMP-FP16 for EchMo in distributed training.
+- BF16/FP16 modes were removed from EchMo training entry and learner path due to instability/performance issues on this model family (NaN risk and speed regression in our environment).
+- EchMo now uses the stable FP32 training path by default.
+- FLOPs profiling was kept as an optional feature via `--profile` instead of always-on execution.
+
+### DDP and Stability Improvements
+
+- Added rank synchronization after rank0-only profiling to avoid DDP desynchronization.
+- Disabled rank0-only graph tracing during distributed training to prevent collective timeout risks.
+- Added FP32 guard for `prf_cuda` custom op invocation path to avoid dtype incompatibility when external autocast is enabled.
+
+### `svrss-echmo` Sync Status
+
+- Synced `run_echmo.py` with optional `--profile`, rank0-only profiling, and post-profile DDP barrier.
+- Synced `learners/model.py` to skip model graph visualization in distributed mode.
+- Synced `models/model_utils/peakconv2d.py` to keep `prf_cuda` call in FP32 (`autocast(enabled=False)` + `float()` input).

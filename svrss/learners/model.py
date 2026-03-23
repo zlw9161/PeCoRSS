@@ -192,9 +192,11 @@ class Model(nn.Module):
                     # if self.model_name != 'mvnet':
                     #     ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
                     optimizer.zero_grad()
-                    if model_vis_flag and self.rank == 0:
+                    if model_vis_flag and self.rank == 0 and not self.distributed:
                         vis_net = self.net.module if self.distributed or isinstance(self.net, nn.parallel.DataParallel) else self.net
                         self.visualizer.model_visualization(vis_net, rd_data)
+                        model_vis_flag = False
+                    elif model_vis_flag and self.rank == 0:
                         model_vis_flag = False
                     rd_outputs = self.net(rd_data) # svrss:rd_data=[6,1,5,124,2048]
                     rd_outputs = rd_outputs.to(self.device)
@@ -204,12 +206,13 @@ class Model(nn.Module):
                     # Case without the CoL
                     rd_losses = [c(rd_outputs, torch.argmax(rd_mask, axis=1))
                                 for c in criterion]
-                    
+
                     rd_loss = torch.mean(torch.stack(rd_losses))
                     # ra_losses = [c(ra_outputs, torch.argmax(ra_mask, axis=1))
                     #              for c in ra_criterion]
                     # ra_loss = torch.mean(torch.stack(ra_losses))
                     loss = rd_loss
+
                     rd_losses_reduced = reduce_value(rd_losses)
                     rd_loss_reduced = reduce_value(rd_loss)
                     # ra_losses_reduced = reduce_value(ra_losses)

@@ -30,8 +30,9 @@ class Evaluator:
 
     def get_pixel_prec_class(self, harmonic_mean=False):
         """Pixel Precision"""
-        prec_by_class = np.diag(self.confusion_matrix) / np.nansum(self.confusion_matrix, axis=0)
-        prec_by_class = np.nan_to_num(prec_by_class)
+        diag = np.diag(self.confusion_matrix)
+        denom = np.nansum(self.confusion_matrix, axis=0)
+        prec_by_class = np.divide(diag, denom, out=np.zeros_like(diag, dtype=float), where=denom != 0)
         if harmonic_mean:
             prec = hmean(prec_by_class)
         else:
@@ -40,8 +41,9 @@ class Evaluator:
 
     def get_pixel_recall_class(self, harmonic_mean=False):
         """Pixel Recall"""
-        recall_by_class = np.diag(self.confusion_matrix) / np.nansum(self.confusion_matrix, axis=1)
-        recall_by_class = np.nan_to_num(recall_by_class)
+        diag = np.diag(self.confusion_matrix)
+        denom = np.nansum(self.confusion_matrix, axis=1)
+        recall_by_class = np.divide(diag, denom, out=np.zeros_like(diag, dtype=float), where=denom != 0)
         if harmonic_mean:
             recall = hmean(recall_by_class)
         else:
@@ -50,11 +52,13 @@ class Evaluator:
 
     def get_pixel_acc_class(self, harmonic_mean=False):
         """Pixel Accuracy"""
-        acc_by_class = np.diag(self.confusion_matrix).sum() / (np.nansum(self.confusion_matrix, axis=1)
-                                                               + np.nansum(self.confusion_matrix, axis=0)
-                                                               + np.diag(self.confusion_matrix).sum()
-                                                               - 2*np.diag(self.confusion_matrix))
-        acc_by_class = np.nan_to_num(acc_by_class)
+        diag = np.diag(self.confusion_matrix)
+        numer = diag.sum()
+        denom = (np.nansum(self.confusion_matrix, axis=1)
+                 + np.nansum(self.confusion_matrix, axis=0)
+                 + diag.sum()
+                 - 2 * diag)
+        acc_by_class = np.divide(numer, denom, out=np.zeros_like(denom, dtype=float), where=denom != 0)
         if harmonic_mean:
             acc = hmean(acc_by_class)
         else:
@@ -63,10 +67,11 @@ class Evaluator:
 
     def get_miou_class(self, harmonic_mean=False):
         """Mean Intersection over Union"""
-        miou_by_class = np.diag(self.confusion_matrix) / (np.nansum(self.confusion_matrix, axis=1)
-                                                          + np.nansum(self.confusion_matrix, axis=0)
-                                                          - np.diag(self.confusion_matrix))
-        miou_by_class = np.nan_to_num(miou_by_class)
+        diag = np.diag(self.confusion_matrix)
+        denom = (np.nansum(self.confusion_matrix, axis=1)
+                 + np.nansum(self.confusion_matrix, axis=0)
+                 - diag)
+        miou_by_class = np.divide(diag, denom, out=np.zeros_like(diag, dtype=float), where=denom != 0)
         if harmonic_mean:
             miou = hmean(miou_by_class)
         else:

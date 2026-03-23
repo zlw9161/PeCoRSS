@@ -124,7 +124,9 @@ if prf_cuda_installed:
 
             x = self.zero_padding(x)
 
-            x_prf = self.prf(x)
+            # prf_cuda does not support BF16, so keep this custom op in FP32.
+            with torch.autocast(device_type='cuda', enabled=False):
+                x_prf = self.prf(x.float())
             # (b, 2c, h*k_pk[0], w*k_pk[1])
             x_prf = self._reshape_x_prf(k_pk[0], k_pk[1], x_prf)
 

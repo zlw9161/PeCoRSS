@@ -203,9 +203,11 @@ class Model(nn.Module):
                     # if self.model_name != 'mvnet':
                     #     ad_data = normalize(ad_data, 'angle_doppler', norm_type=self.norm_type)
                     optimizer.zero_grad()
-                    if model_vis_flag and self.rank == 0:
+                    if model_vis_flag and self.rank == 0 and not self.distributed:
                         vis_net = self.net.module if self.distributed or isinstance(self.net, nn.parallel.DataParallel) else self.net
                         self.visualizer.model_visualization(vis_net, rd_data)
+                        model_vis_flag = False
+                    elif model_vis_flag and self.rank == 0:
                         model_vis_flag = False
                     rd_outputs = self.net(rd_data) # svrss:rd_data=[6,1,5,124,2048]
                     rd_outputs = rd_outputs.to(self.device)

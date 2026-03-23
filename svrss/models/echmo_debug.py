@@ -185,6 +185,94 @@ class LMF_Chain(nn.Module):
         return x
 
 
+# class Multi_Order_LDC(nn.Module):
+#     # Multi-order Learnable Delay Canceler (MLDC)
+#     def __init__(self, in_ch, out_ch, orders, activation='relu', bias=True):
+#         super(Multi_Order_LDC, self).__init__()
+#         self.in_ch = in_ch
+#         self.out_ch = out_ch
+#         self.orders = orders
+#         self.activation = activation
+#         self.bias = bias
+#         self.hp_coefs = self.get_highpass_coefs()
+#         self.hp_kernels = self.init_highpass_kernels()
+#         self.ldc_list = nn.ModuleList()
+#         self.pad_list = nn.ModuleList()
+#         for n in range(self.orders):
+#             ldc = nn.Conv2d(self.in_ch, self.out_ch, 
+#                             kernel_size=(n+2, 1),
+#                             bias=self.bias)
+#             pad = torch.nn.ZeroPad2d(padding=(0, 0, n+1, 0))
+#             self.in_ch = self.out_ch
+#             with torch.no_grad():
+#                 ldc.weight.data = self.hp_kernels[n]
+#             self.ldc_list.append(ldc)
+#             self.pad_list.append(pad)
+#         # self.batch_norm = ComplexBatchNorm2d(num_features=self.orders*self.out_ch)
+#         self.cmplx_relu = ComplexReLU(self.activation)
+
+#     # LDC kernel initialized w/ high-pass filters, bias (optional)
+#     def get_highpass_coefs(self):
+#         import math
+#         hp_coefs = []
+#         for j in range(self.orders):
+#             n = j + 1
+#             hp_coefs_n = torch.zeros(n+1, 1)
+#             for i in range(n+1):
+#                 if i == 0:
+#                     hp_coefs_n[i] = 1
+#                 else:
+#                     # (-1)^i \cdot \frac{n!}{i!(n-i)!}
+#                     hp_coefs_n[i] = (-1)**(i) * math.factorial(n) // (math.factorial(i) * math.factorial(n-i))
+#             hp_coefs.append(hp_coefs_n)
+#         return hp_coefs
+        
+#     def init_highpass_kernels(self):
+#         hp_kernels = []
+#         for n in range(len(self.hp_coefs)):
+#             hp_kernels_n = self.hp_coefs[n].unsqueeze(dim=0).unsqueeze(dim=0).broadcast_to(self.out_ch,
+#                                                                                            self.in_ch,
+#                                                                                            n+2,
+#                                                                                            1)
+#             hp_kernels.append(nn.Parameter(hp_kernels_n))
+#         return hp_kernels
+    
+#     def forward(self, x):
+#         # input: \hat{X}: (B, C_K, P, R)
+#         # output: \tilde{X}: (B, (orders+1)*C_H, P, R)
+#         B, P, R = x.shape[0], x.shape[2], x.shape[3]
+#         x = x.unsqueeze(dim=1).broadcast_to(B, self.orders, 
+#                                             x.shape[1], P, R)
+#         y_r = torch.zeros(B, self.orders, self.out_ch, P, R).to(x.device)
+#         y_i = torch.zeros(B, self.orders, self.out_ch, P, R).to(x.device)
+#         for n in range(self.orders):
+#             x_n_real = self.ldc_list[n](self.pad_list[n](x[:,n,...].real))
+#             x_n_imag = self.ldc_list[n](self.pad_list[n](x[:,n,...].imag))
+#             y_r[:,n,...] = x_n_real
+#             y_i[:,n,...] = x_n_imag # x_n_real + 1j * x_n_imag
+
+#             # import matplotlib.pyplot as plt
+#             # import numpy as np
+#             # fig_ldc = plt.figure('LDC-'+str(n+1), figsize=(6, 12))
+#             # ldc_vis = x_n_real[0,0,:,:].detach().numpy()
+#             # ldc_input = x[0,n,0,...].real.detach().numpy()
+#             # grid_x, grid_y = np.arange(ldc_vis.shape[1]), np.arange(ldc_vis.shape[0])
+#             # grid_x, grid_y = np.meshgrid(grid_x, grid_y)
+#             # ax1 = fig_ldc.add_subplot(211, projection='3d')
+#             # print('ldc_input:', ldc_input.shape)
+#             # ax1.plot_surface(grid_x, grid_y, ldc_input, cmap='viridis')
+#             # ax1.set_title('ldc input.')
+#             # ax2 = fig_ldc.add_subplot(212, projection='3d')
+#             # ax2.plot_surface(grid_x, grid_y, ldc_vis, cmap='viridis')
+#             # ax2.set_title('ldc output')
+        
+#         y_r = y_r.view(B, self.orders*self.out_ch, P, R)
+#         y_i = y_i.view(B, self.orders*self.out_ch, P, R)
+#         y = torch.complex(y_r, y_i)
+#         # y = self.batch_norm(y)
+#         y = self.cmplx_relu(y)
+#         return y
+
 class Multi_Order_LDC(nn.Module):
     # Multi-order Learnable Delay Canceler (MLDC)
     def __init__(self, in_ch, out_ch, orders, activation='relu', bias=True):
@@ -196,17 +284,16 @@ class Multi_Order_LDC(nn.Module):
         self.bias = bias
         self.hp_coefs = self.get_highpass_coefs()
         self.hp_kernels = self.init_highpass_kernels()
-        self.ldc_list = nn.ModuleList()
         self.pad_list = nn.ModuleList()
+        if self.bias:
+            self.hp_biases = nn.ParameterList([
+                nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+                for _ in range(self.orders)
+            ])
+        else:
+            self.hp_biases = None
         for n in range(self.orders):
-            ldc = nn.Conv2d(self.in_ch, self.out_ch, 
-                            kernel_size=(n+2, 1),
-                            bias=self.bias)
             pad = torch.nn.ZeroPad2d(padding=(0, 0, n+1, 0))
-            self.in_ch = self.out_ch
-            with torch.no_grad():
-                ldc.weight.data = self.hp_kernels[n]
-            self.ldc_list.append(ldc)
             self.pad_list.append(pad)
         # self.batch_norm = ComplexBatchNorm2d(num_features=self.orders*self.out_ch)
         self.cmplx_relu = ComplexReLU(self.activation)
@@ -228,13 +315,13 @@ class Multi_Order_LDC(nn.Module):
         return hp_coefs
         
     def init_highpass_kernels(self):
-        hp_kernels = []
+        hp_kernels = nn.ParameterList()
         for n in range(len(self.hp_coefs)):
             hp_kernels_n = self.hp_coefs[n].unsqueeze(dim=0).unsqueeze(dim=0).broadcast_to(self.out_ch,
                                                                                            self.in_ch,
                                                                                            n+2,
                                                                                            1)
-            hp_kernels.append(nn.Parameter(hp_kernels_n))
+            hp_kernels.append(nn.Parameter(hp_kernels_n.clone().contiguous()))
         return hp_kernels
     
     def forward(self, x):
@@ -243,28 +330,23 @@ class Multi_Order_LDC(nn.Module):
         B, P, R = x.shape[0], x.shape[2], x.shape[3]
         x = x.unsqueeze(dim=1).broadcast_to(B, self.orders, 
                                             x.shape[1], P, R)
-        y_r = torch.zeros(B, self.orders, self.out_ch, P, R).cuda()
-        y_i = torch.zeros(B, self.orders, self.out_ch, P, R).cuda()
+        # 20250807
+        y_r = torch.zeros(B, self.orders, self.out_ch, P, R).to(x.device)
+        y_i = torch.zeros(B, self.orders, self.out_ch, P, R).to(x.device)
         for n in range(self.orders):
-            x_n_real = self.ldc_list[n](self.pad_list[n](x[:,n,...].real))
-            x_n_imag = self.ldc_list[n](self.pad_list[n](x[:,n,...].imag))
+            bias = self.hp_biases[n] if self.bias else None
+            x_n_real = F.conv2d(self.pad_list[n](x[:, n, ...].real),
+                                self.hp_kernels[n],
+                                bias=bias,
+                                stride=(1, 1),
+                                padding=0)
+            x_n_imag = F.conv2d(self.pad_list[n](x[:, n, ...].imag),
+                                self.hp_kernels[n],
+                                bias=bias,
+                                stride=(1, 1),
+                                padding=0)
             y_r[:,n,...] = x_n_real
             y_i[:,n,...] = x_n_imag # x_n_real + 1j * x_n_imag
-
-            # import matplotlib.pyplot as plt
-            # import numpy as np
-            # fig_ldc = plt.figure('LDC-'+str(n+1), figsize=(6, 12))
-            # ldc_vis = x_n_real[0,0,:,:].detach().numpy()
-            # ldc_input = x[0,n,0,...].real.detach().numpy()
-            # grid_x, grid_y = np.arange(ldc_vis.shape[1]), np.arange(ldc_vis.shape[0])
-            # grid_x, grid_y = np.meshgrid(grid_x, grid_y)
-            # ax1 = fig_ldc.add_subplot(211, projection='3d')
-            # print('ldc_input:', ldc_input.shape)
-            # ax1.plot_surface(grid_x, grid_y, ldc_input, cmap='viridis')
-            # ax1.set_title('ldc input.')
-            # ax2 = fig_ldc.add_subplot(212, projection='3d')
-            # ax2.plot_surface(grid_x, grid_y, ldc_vis, cmap='viridis')
-            # ax2.set_title('ldc output')
         
         y_r = y_r.view(B, self.orders*self.out_ch, P, R)
         y_i = y_i.view(B, self.orders*self.out_ch, P, R)
@@ -330,7 +412,7 @@ class Group_Purturble_DF(nn.Module):
         # input: \tilde{X}: (B, groups*C_H, P, R)
         # output: \dot{X}: (B, groups*C_D, 1, R) --> (B, groups, C_D, R)
         B, R = x.shape[0], x.shape[3]
-        x_real, x_imag = x.real.cuda(), x.imag.cuda()
+        x_real, x_imag = x.real.to(x.device), x.imag.to(x.device)
         # x_real, x_imag = x.real, x.imag
         x_rr = F.conv2d(x_real, self.cos_kernel, self.cos_bias, stride=self.stride, padding=0, groups=self.groups)
         x_ii = F.conv2d(x_imag, self.sin_kernel, self.sin_bias, stride=self.stride, padding=0, groups=self.groups)
@@ -460,10 +542,11 @@ class EchMo(nn.Module):
         # for amp+phase+I/Q                              
         self.RDTranslator = PKCIn4ANY_cuda(n_classes=self.n_classes,
                                            n_frames=self.n_frames,
-                                           in_ch=self.df_groups*4,
+                                           in_ch=self.df_groups,
                                            w=self.df_channels,
                                            h=self.n_range)
         self.RDTranslator.apply(_init_translator_weights)
+        self.amp_bf16_translator_only = False
 
 
     def forward(self, x):
@@ -507,11 +590,15 @@ class EchMo(nn.Module):
         # ax2.set_title('gdf output (avg)')
 
         # convert e to real, and add temporal dim
-        # x_d = torch.abs(x_d).unsqueeze(dim=2) # amp-only
+        x_d = torch.abs(x_d).unsqueeze(dim=2) # amp-only
         # x_d = torch.cat((x_d.real, x_d.imag), dim=1).unsqueeze(dim=2) # I/Q
         # x_d = torch.cat((torch.angle(x_d), torch.abs(x_d)), dim=1).unsqueeze(dim=2) # phase+amp (pham)
-        x_d = torch.cat((torch.abs(x_d), torch.angle(x_d), x_d.real, x_d.imag), dim=1).unsqueeze(dim=2) # amp+phase+I+Q
-        y = self.RDTranslator(x_d)
+        # x_d = torch.cat((torch.abs(x_d), torch.angle(x_d), x_d.real, x_d.imag), dim=1).unsqueeze(dim=2) # amp+phase+I+Q
+        if self.amp_bf16_translator_only and x_d.is_cuda:
+            with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=True):
+                y = self.RDTranslator(x_d)
+        else:
+            y = self.RDTranslator(x_d)
         return y
 
 
