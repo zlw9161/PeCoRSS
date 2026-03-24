@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--cfg', help='Path to config file.', default='config.json', type=str, required=True)
     parser.add_argument('--dataset', default='Carrada_RD', help='dataset for model training,\
-                        options: Carrada_RD, Carrada_RA, CarradaRAC_RD, CarradaRAC_RA, CWRdata, PDRdata, RDSyn, XPDdata', type=str)
+                        options: Carrada_RD, Carrada_RA, CarradaRAC_RD, CarradaRAC_RA, CWRdata, PDRdata, RDSyn, XPDdata, NuaaSim, LSFJamming', type=str)
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
     parser.add_argument('--sync-bn', dest='sync_bn', help='Use sync batch norm', action='store_true')
     parser.add_argument('--finetune', help='the finetune path of model', action='store_true')
@@ -35,6 +35,8 @@ def main():
         cfg['nb_classes'] = 5
     elif cfg['dataset'] in ['XPDdata', 'RDSyn', 'NuaaSim']:
         cfg['nb_classes'] = 2
+    elif cfg['dataset'] == 'LSFJamming':
+        cfg['nb_classes'] = 7
     else:
         raise KeyError('Dataset {} has not been supported yet.'.format(cfg['dataset']))
     

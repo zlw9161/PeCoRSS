@@ -53,16 +53,15 @@ class Evaluator:
     def get_pixel_acc_class(self, harmonic_mean=False):
         """Pixel Accuracy"""
         diag = np.diag(self.confusion_matrix)
-        numer = diag.sum()
-        denom = (np.nansum(self.confusion_matrix, axis=1)
-                 + np.nansum(self.confusion_matrix, axis=0)
-                 + diag.sum()
-                 - 2 * diag)
-        acc_by_class = np.divide(numer, denom, out=np.zeros_like(denom, dtype=float), where=denom != 0)
+        row_sum = np.nansum(self.confusion_matrix, axis=1)
+        # Per-class pixel accuracy is TP / GT pixels for each class.
+        acc_by_class = np.divide(diag, row_sum, out=np.zeros_like(diag, dtype=float), where=row_sum != 0)
+        total = np.nansum(self.confusion_matrix)
+        global_acc = float(diag.sum() / total) if total != 0 else 0.0
         if harmonic_mean:
             acc = hmean(acc_by_class)
         else:
-            acc = np.mean(acc_by_class)
+            acc = global_acc
         return acc, acc_by_class
 
     def get_miou_class(self, harmonic_mean=False):

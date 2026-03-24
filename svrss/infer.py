@@ -8,7 +8,7 @@ from svrss.utils.paths import Paths
 from svrss.utils.functions import count_params
 from svrss.learners.tester import Tester
 from svrss.learners.tester_cfar import Tester as CFARTester
-from svrss.loaders.dataset import Carrada, PDRdata, CWRdata, RDSyn, XPDdata
+from svrss.loaders.dataset import Carrada, PDRdata, CWRdata, RDSyn, XPDdata, LSFJamming
 from svrss.models import CWRNet, PKCIn4CWR, PKCIn4CWR_Dns, TARSS4CWR_V1, TARSS4CWR_V2
 from svrss.models import KuRADNet, KuRADNet_WSkip, PKCIn4PDR, PKCIn4PDR_Dns, TARSS4PDR_V1, TARSS4PDR_V2
 from svrss.models import BaseLine3D, TARSSNet_V1_RD, TARSSNet_V1_RA, TARSSNet_V2_RD, TARSSNet_V2_RA
@@ -136,6 +136,8 @@ def test_model():
         data = RDSyn()
     elif cfg['dataset'] == 'XPDdata':
         data = XPDdata()
+    elif cfg['dataset'] == 'LSFJamming':
+        data = LSFJamming()
     test = data.get('Test')
     testset = SequenceDataset(test)
     seq_testloader = DataLoader(testset, batch_size=1, shuffle=False, num_workers=0)

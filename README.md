@@ -4,7 +4,7 @@
 
 **Developed by PeCoLab of ISTA@CASIC**
 
-[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![Version](https://img.shields.io/badge/Version-1.0.4-brightgreen.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
+[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![Version](https://img.shields.io/badge/Version-1.0.5-brightgreen.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
 
 </div>
 
@@ -285,6 +285,10 @@ KuRALS contains two sub-datasets:
 | | PKCIn4Any | PKCIn for any dataset | sv (RD/RA) |
 | | AdaPKC | To be merged | sv (RD/RA) |
 | | TFoc | To be merged | sv (RD/RA) |
+| **NuaaSim** | EchMo / rEchMo | Echo-in mask-out segmentation for synthetic RD data | sv (RD only) |
+| | PKCIn4Any_cuda | Generic PKCIn baseline for single-view RD segmentation | sv (RD only) |
+| **LSFJamming** | EchMo / rEchMo | Jamming-aware RD segmentation (7 classes) | sv (RD only) |
+| | PKCIn4Any_cuda | Generic PKCIn baseline for LSFJamming RD segmentation | sv (RD only) |
 
 ### Multi-View RSS (`mvrss`)
 
@@ -471,6 +475,8 @@ python set_paths.py \
   --carrada /path/to/Carrada \
   --cwr /path/to/KuRALS/KuCW \
   --pdr /path/to/KuRALS/KuPD \
+  --nuaasim /path/to/NuaaSim/npy \
+  --lsf_jamming /path/to/LSFJamming \
   --logs /path/to/logs
 ```
 
@@ -626,7 +632,7 @@ If you find PeCoRSS useful in your research, please consider citing the followin
 | Field | Info |
 |:------|:-----|
 | **Package** | `pecorss` |
-| **Version** | `1.0.4` |
+| **Version** | `1.0.5` |
 | **License** | Apache 2.0 |
 | **Repository** | [https://github.com/zlw9161](https://github.com/zlw9161) |
 | **Contact** | lwzhang9161@126.com |
@@ -653,23 +659,28 @@ For detailed release notes and version history, see [CHANGELOG.md](./CHANGELOG.m
 
 ---
 
-## 📝 Update Log (v1.0.4)
+## 📝 Update Log (v1.0.5)
 
-### AMP and Profile Decisions
+### EchMo LMF_V6 Upgrade
 
-- We evaluated AMP-BF16 and AMP-FP16 for EchMo in distributed training.
-- BF16/FP16 modes were removed from EchMo training entry and learner path due to instability/performance issues on this model family (NaN risk and speed regression in our environment).
-- EchMo now uses the stable FP32 training path by default.
-- FLOPs profiling was kept as an optional feature via `--profile` instead of always-on execution.
+- Added `Leanable_Match_FilterV6` in `svrss/models/echmo_debug.py`.
+- The first LMF layer keeps prior-guided matched-filter initialization, while deeper layers use residual correction instead of repeatedly re-applying the same prior.
+- EchMo RD translation was updated to use amp+phase+I/Q features for the downstream real-valued translator.
+- Added multiple NuaaSim EchMo configs for scale validation, ablation, and recall-oriented tuning.
 
-### DDP and Stability Improvements
+### LSFJamming Support in `svrss`
 
-- Added rank synchronization after rank0-only profiling to avoid DDP desynchronization.
-- Disabled rank0-only graph tracing during distributed training to prevent collective timeout risks.
-- Added FP32 guard for `prf_cuda` custom op invocation path to avoid dtype incompatibility when external autocast is enabled.
+- Added dataset path setup and runtime path registration for `LSFJamming`.
+- Added `LSFJamming` dataset loading, frame routing, inference/test integration, normalization stats, and weight files in `svrss`.
+- Aligned LSFJamming mask handling to the observed 7-class labels and synced the customized `lsf_wce` loss into `svrss`.
 
-### `svrss-echmo` Sync Status
+### Evaluation and Training Diagnostics
 
-- Synced `run_echmo.py` with optional `--profile`, rank0-only profiling, and post-profile DDP barrier.
-- Synced `learners/model.py` to skip model graph visualization in distributed mode.
-- Synced `models/model_utils/peakconv2d.py` to keep `prf_cuda` call in FP32 (`autocast(enabled=False)` + `float()` input).
+- Replaced verbose `processing: n / total` logging with a compact single-line progress bar in test loops.
+- Added recall-by-class and confusion-matrix logging during validation and test to make foreground failure modes easier to inspect.
+- Added configurable `focal_gamma` support for focal-based losses in JSON configs.
+
+### Notes
+
+- Detailed release notes are available in [CHANGELOG.md](./CHANGELOG.md).
+- Current package version is `1.0.5`.

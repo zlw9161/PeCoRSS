@@ -162,6 +162,63 @@ class Leanable_Match_FilterV5(nn.Module):
         return x
 
 
+class Leanable_Match_FilterV6(nn.Module):
+    def __init__(self, k_size, in_ch, out_ch, lmf_coef, activation='relu', bias=True, residual_mode=False):
+        super(Leanable_Match_FilterV6, self).__init__()
+        self.k_size = k_size
+        self.stride = 1
+        self.in_ch = in_ch
+        self.out_ch = out_ch
+        self.mf = lmf_coef.view(1, 1, 1, self.k_size)
+        self.activation = activation
+        self.bias = bias
+        self.residual_mode = residual_mode
+        if self.residual_mode:
+            if self.in_ch != self.out_ch:
+                raise ValueError('Residual LMF layers require in_ch == out_ch.')
+            kernel_real, kernel_imag = self.init_residual_kernels()
+        else:
+            kernel_real, kernel_imag = self.init_prior_kernels()
+        self.kernel_real = nn.Parameter(kernel_real)
+        self.kernel_imag = nn.Parameter(kernel_imag)
+        if self.bias:
+            self.bias_real = nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+            self.bias_imag = nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+        else:
+            self.register_parameter('bias_real', None)
+            self.register_parameter('bias_imag', None)
+
+        self.cause_padding = torch.nn.ZeroPad2d(padding=(0, self.k_size - 1, 0, 0))
+        self.cmplx_relu = ComplexReLU(self.activation)
+
+    def init_prior_kernels(self):
+        real_kernel = self.mf.real.broadcast_to(self.out_ch, self.in_ch, 1, self.k_size)
+        imag_kernel = self.mf.imag.broadcast_to(self.out_ch, self.in_ch, 1, self.k_size)
+        return real_kernel.clone().contiguous(), imag_kernel.clone().contiguous()
+
+    def init_residual_kernels(self):
+        shape = (self.out_ch, self.in_ch, 1, self.k_size)
+        real_kernel = torch.zeros(shape, dtype=torch.float32)
+        imag_kernel = torch.zeros(shape, dtype=torch.float32)
+        return real_kernel, imag_kernel
+
+    def _complex_conv(self, x):
+        inputR = self.cause_padding(x.real)
+        inputI = self.cause_padding(x.imag)
+        x_RR = F.conv2d(inputR, self.kernel_real, self.bias_real, stride=(1, 1), padding=0)
+        x_II = F.conv2d(inputI, self.kernel_imag, self.bias_imag, stride=(1, 1), padding=0)
+        x_RI = F.conv2d(inputR, self.kernel_imag, self.bias_imag, stride=(1, 1), padding=0)
+        x_IR = F.conv2d(inputI, self.kernel_real, self.bias_real, stride=(1, 1), padding=0)
+        return x_RR - x_II + 1j * (x_RI + x_IR)
+
+    def forward(self, x):
+        x_filtered = self._complex_conv(x)
+        if self.residual_mode:
+            x_residual = self.cmplx_relu(x_filtered)
+            return x + x_residual
+        return self.cmplx_relu(x_filtered)
+
+
 class LMF_Chain(nn.Module):
     def __init__(self, configs):
         super(LMF_Chain, self).__init__()
@@ -171,107 +228,22 @@ class LMF_Chain(nn.Module):
         # self.mf_coef = torch.tensor(self.mf_coef.copy()).to()
         self.Chain = nn.Sequential()
         for l in range(configs.lmf_layers):
-            self.Chain.add_module('lmfV5-{0}'.format(l),
-                                  Leanable_Match_FilterV5(k_size=self.lmf_coef.shape[1],
+            residual_mode = l > 0
+            module_name = 'lmfV6-res-{0}'.format(l) if residual_mode else 'lmfV6-prior-{0}'.format(l)
+            self.Chain.add_module(module_name,
+                                  Leanable_Match_FilterV6(k_size=self.lmf_coef.shape[1],
                                                           in_ch=self.in_ch,
                                                           out_ch=configs.lmf_channels,
                                                           lmf_coef=self.lmf_coef,
                                                           activation=configs.activation,
-                                                          bias=configs.bias))
+                                                          bias=configs.bias,
+                                                          residual_mode=residual_mode))
             self.in_ch = configs.lmf_channels
 
     def forward(self, x):
         x = self.Chain(x)
         return x
 
-
-# class Multi_Order_LDC(nn.Module):
-#     # Multi-order Learnable Delay Canceler (MLDC)
-#     def __init__(self, in_ch, out_ch, orders, activation='relu', bias=True):
-#         super(Multi_Order_LDC, self).__init__()
-#         self.in_ch = in_ch
-#         self.out_ch = out_ch
-#         self.orders = orders
-#         self.activation = activation
-#         self.bias = bias
-#         self.hp_coefs = self.get_highpass_coefs()
-#         self.hp_kernels = self.init_highpass_kernels()
-#         self.ldc_list = nn.ModuleList()
-#         self.pad_list = nn.ModuleList()
-#         for n in range(self.orders):
-#             ldc = nn.Conv2d(self.in_ch, self.out_ch, 
-#                             kernel_size=(n+2, 1),
-#                             bias=self.bias)
-#             pad = torch.nn.ZeroPad2d(padding=(0, 0, n+1, 0))
-#             self.in_ch = self.out_ch
-#             with torch.no_grad():
-#                 ldc.weight.data = self.hp_kernels[n]
-#             self.ldc_list.append(ldc)
-#             self.pad_list.append(pad)
-#         # self.batch_norm = ComplexBatchNorm2d(num_features=self.orders*self.out_ch)
-#         self.cmplx_relu = ComplexReLU(self.activation)
-
-#     # LDC kernel initialized w/ high-pass filters, bias (optional)
-#     def get_highpass_coefs(self):
-#         import math
-#         hp_coefs = []
-#         for j in range(self.orders):
-#             n = j + 1
-#             hp_coefs_n = torch.zeros(n+1, 1)
-#             for i in range(n+1):
-#                 if i == 0:
-#                     hp_coefs_n[i] = 1
-#                 else:
-#                     # (-1)^i \cdot \frac{n!}{i!(n-i)!}
-#                     hp_coefs_n[i] = (-1)**(i) * math.factorial(n) // (math.factorial(i) * math.factorial(n-i))
-#             hp_coefs.append(hp_coefs_n)
-#         return hp_coefs
-        
-#     def init_highpass_kernels(self):
-#         hp_kernels = []
-#         for n in range(len(self.hp_coefs)):
-#             hp_kernels_n = self.hp_coefs[n].unsqueeze(dim=0).unsqueeze(dim=0).broadcast_to(self.out_ch,
-#                                                                                            self.in_ch,
-#                                                                                            n+2,
-#                                                                                            1)
-#             hp_kernels.append(nn.Parameter(hp_kernels_n))
-#         return hp_kernels
-    
-#     def forward(self, x):
-#         # input: \hat{X}: (B, C_K, P, R)
-#         # output: \tilde{X}: (B, (orders+1)*C_H, P, R)
-#         B, P, R = x.shape[0], x.shape[2], x.shape[3]
-#         x = x.unsqueeze(dim=1).broadcast_to(B, self.orders, 
-#                                             x.shape[1], P, R)
-#         y_r = torch.zeros(B, self.orders, self.out_ch, P, R).to(x.device)
-#         y_i = torch.zeros(B, self.orders, self.out_ch, P, R).to(x.device)
-#         for n in range(self.orders):
-#             x_n_real = self.ldc_list[n](self.pad_list[n](x[:,n,...].real))
-#             x_n_imag = self.ldc_list[n](self.pad_list[n](x[:,n,...].imag))
-#             y_r[:,n,...] = x_n_real
-#             y_i[:,n,...] = x_n_imag # x_n_real + 1j * x_n_imag
-
-#             # import matplotlib.pyplot as plt
-#             # import numpy as np
-#             # fig_ldc = plt.figure('LDC-'+str(n+1), figsize=(6, 12))
-#             # ldc_vis = x_n_real[0,0,:,:].detach().numpy()
-#             # ldc_input = x[0,n,0,...].real.detach().numpy()
-#             # grid_x, grid_y = np.arange(ldc_vis.shape[1]), np.arange(ldc_vis.shape[0])
-#             # grid_x, grid_y = np.meshgrid(grid_x, grid_y)
-#             # ax1 = fig_ldc.add_subplot(211, projection='3d')
-#             # print('ldc_input:', ldc_input.shape)
-#             # ax1.plot_surface(grid_x, grid_y, ldc_input, cmap='viridis')
-#             # ax1.set_title('ldc input.')
-#             # ax2 = fig_ldc.add_subplot(212, projection='3d')
-#             # ax2.plot_surface(grid_x, grid_y, ldc_vis, cmap='viridis')
-#             # ax2.set_title('ldc output')
-        
-#         y_r = y_r.view(B, self.orders*self.out_ch, P, R)
-#         y_i = y_i.view(B, self.orders*self.out_ch, P, R)
-#         y = torch.complex(y_r, y_i)
-#         # y = self.batch_norm(y)
-#         y = self.cmplx_relu(y)
-#         return y
 
 class Multi_Order_LDC(nn.Module):
     # Multi-order Learnable Delay Canceler (MLDC)
@@ -542,11 +514,10 @@ class EchMo(nn.Module):
         # for amp+phase+I/Q                              
         self.RDTranslator = PKCIn4ANY_cuda(n_classes=self.n_classes,
                                            n_frames=self.n_frames,
-                                           in_ch=self.df_groups,
+                                           in_ch=self.df_groups*4,
                                            w=self.df_channels,
                                            h=self.n_range)
         self.RDTranslator.apply(_init_translator_weights)
-        self.amp_bf16_translator_only = False
 
 
     def forward(self, x):
@@ -590,15 +561,11 @@ class EchMo(nn.Module):
         # ax2.set_title('gdf output (avg)')
 
         # convert e to real, and add temporal dim
-        x_d = torch.abs(x_d).unsqueeze(dim=2) # amp-only
+        # x_d = torch.abs(x_d).unsqueeze(dim=2) # amp-only
         # x_d = torch.cat((x_d.real, x_d.imag), dim=1).unsqueeze(dim=2) # I/Q
         # x_d = torch.cat((torch.angle(x_d), torch.abs(x_d)), dim=1).unsqueeze(dim=2) # phase+amp (pham)
-        # x_d = torch.cat((torch.abs(x_d), torch.angle(x_d), x_d.real, x_d.imag), dim=1).unsqueeze(dim=2) # amp+phase+I+Q
-        if self.amp_bf16_translator_only and x_d.is_cuda:
-            with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=True):
-                y = self.RDTranslator(x_d)
-        else:
-            y = self.RDTranslator(x_d)
+        x_d = torch.cat((torch.abs(x_d), torch.angle(x_d), x_d.real, x_d.imag), dim=1).unsqueeze(dim=2) # amp+phase+I+Q
+        y = self.RDTranslator(x_d)
         return y
 
 

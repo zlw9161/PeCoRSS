@@ -41,18 +41,29 @@ def get_class_weights(dataset_type, signal_type):
         file_name = 'rd17'
     elif dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
         file_name = 'carrada'
+    elif dataset_type == 'LSFJamming':
+        file_name = 'lsfjamming'
     else:
-        raise ValueError('Dataset type {} is not supported.'.format(dataset_type))
+        file_name = None
     
-    if signal_type in ('range_angle'):
+    if signal_type in ('range_angle') and file_name is not None:
         file_name = file_name + '_' + 'ra_weights.json'
-    elif signal_type in ('range_doppler'):
+    elif signal_type in ('range_doppler') and file_name is not None:
         file_name = file_name + '_' + 'rd_weights.json'
     else:
-        raise ValueError('Signal type {} is not supported.'.format(signal_type))
-    file_path = weight_path / file_name
-    with open(file_path, 'r') as fp:
-        weights = json.load(fp)
+        print(f'>>>| Warning: Dataset type {dataset_type} is not supported for loading class weights. \n'
+              f'Defaulting to uniform or pre-set weights.')
+        print(f'>>>| Tips: If you want to use custom weights, please add a json file named as: \n'
+              f'dataname_rd(or ra)_weights.json in the config_files folder, with the format: \n'
+              f'    - {{"Background": 0.1, "UAV": 0.2, "Pedestrian": 0.2, "Car": 0.2, "Boat": 0.3}} for PDRdata; \n'
+              f'    - {{"background": 0.1, "target": 0.9}} for RDSyn; \n')
+    
+    if file_name is not None:
+        file_path = weight_path / file_name
+        with open(file_path, 'r') as fp:
+            weights = json.load(fp)
+    else:
+        weights = None
     
     if dataset_type == 'CWRdata':
         weights = np.array([weights['Background'], weights['UAV'],
@@ -66,10 +77,18 @@ def get_class_weights(dataset_type, signal_type):
                         weights['cyclist'], weights['car']])
     elif dataset_type in ['RDSyn']:
         weights = np.array([weights['background'], weights['target']])
+    elif dataset_type in ['LSFJamming']:
+        weights = np.array([weights['Background'], weights['Target'], weights['deceptive_dft_jammer'],
+                            weights['deceptive_isr_jammer'], weights['deceptive_sli_jammer'], weights['barrage_wide_jamming'],
+                            weights['barrage_narrow_jamming']])
+    elif dataset_type == 'XPDdata':
+        weights = np.array([0.1, 0.9])
+    elif dataset_type == 'NuaaSim':
+        # Extreme pixel imbalance for foreground in NuaaSim:
+        # keep background weight near zero and strongly up-weight class-1.
+        weights = np.array([0.0002, 0.9998])
     else:
         raise ValueError('Dataset type {} is not supported.'.format(dataset_type))
-    # weights = np.array([weights['background'], weights['UAV'],
-    #                     weights['Pedestrian'], weights['Vehicle']])
     weights = torch.from_numpy(weights)
     return weights
 
@@ -172,6 +191,8 @@ def normalize(data, dataset_type, signal_type, norm_type='local'):
         file_name = 'rd17'
     elif dataset_type == 'NuaaSim':
         file_name = 'nuaasim'
+    elif dataset_type == 'LSFJamming':
+        file_name = 'lsf'
     elif dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
         file_name = 'carrada'
     else:
@@ -234,7 +255,7 @@ def normalize(data, dataset_type, signal_type, norm_type='local'):
     return norm_data
 
 
-def define_loss(dataset_type, signal_type, custom_loss, device):
+def define_loss(dataset_type, signal_type, custom_loss, device, focal_gamma=None):
     """
     Method to define the loss to use during training
 
@@ -252,13 +273,18 @@ def define_loss(dataset_type, signal_type, custom_loss, device):
     """
     if custom_loss == 'ce':
         loss = [nn.CrossEntropyLoss(), lambda x, y: torch.tensor(0., device=x.device)]
+    elif custom_loss == 'lsf_wce':
+        class_weights = [0.01748487, 1., 1., 1., 1., 0.04660571, 0.04688167]
+        class_weights = torch.tensor(class_weights, dtype=torch.float32, device=device)
+        loss = [nn.CrossEntropyLoss(weight=class_weights), lambda x, y: torch.tensor(0., device=x.device)]
     elif custom_loss == 'wce':
         weights = get_class_weights(dataset_type, signal_type)
         loss = [nn.CrossEntropyLoss(weight=weights.to(device).float()), lambda x, y: torch.tensor(0., device=x.device)]
     elif custom_loss == 'sdice':
         loss = [SoftDiceLoss(), lambda x, y: torch.tensor(0., device=x.device)]
     elif custom_loss == 'focal':
-        loss = [FocalLoss(weight=None), lambda x, y: torch.tensor(0., device=x.device)]
+        gamma = 2 if focal_gamma is None else float(focal_gamma)
+        loss = [FocalLoss(weight=None, gamma=gamma), lambda x, y: torch.tensor(0., device=x.device)]
     elif custom_loss == 'wce_w10sdice':
         weights = get_class_weights(dataset_type, signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
@@ -266,7 +292,8 @@ def define_loss(dataset_type, signal_type, custom_loss, device):
     elif fnmatch(custom_loss, 'wfocal_w*sdice'):
         weights = get_class_weights(dataset_type, signal_type)
         # ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=1., gamma=4.)
+        gamma = 4 if focal_gamma is None else float(focal_gamma)
+        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=1., gamma=gamma)
         loss = [focal_loss, SoftDiceLoss(global_weight=float(custom_loss[8:-5]))]
     # lt@20230610 for cwr dataset
     elif custom_loss == 'w20focal_wesub1sdicev2':
@@ -428,8 +455,10 @@ def get_qualitatives(outputs, masks, paths, seq_name, quali_iter, signal_type=No
         num_class = 4
     elif dataset_type == 'PDRdata':
         num_class = 5
-    elif dataset_type in ['XPDdata', 'RDSyn']:
+    elif dataset_type in ['XPDdata', 'RDSyn', 'NuaaSim']:
         num_class = 2
+    elif dataset_type == 'LSFJamming':
+        num_class = 7
     else:
         raise KeyError(f'Dataset {dataset_type} has not been supported yet.')
     

@@ -40,6 +40,7 @@ class Tester:
         self.batch_size = self.cfg['batch_size']
         self.device = self.cfg['device']
         self.custom_loss = self.cfg['custom_loss']
+        self.focal_gamma = self.cfg.get('focal_gamma', None)
         self.transform_names = self.cfg['transformations'].split(',')
         self.norm_type = self.cfg['norm_type']
         self.distributed = self.cfg['distributed']
@@ -73,10 +74,10 @@ class Tester:
                                               sizes=(self.w_size, self.h_size))
         if self.dataset in ['Carrada_RA', 'CarradaRAC_RA']:
             signal_type = 'range_angle'
-            criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device)
-        elif self.dataset in ['CWRdata', 'PDRdata', 'Carrada_RD', 'CarradaRAC_RD', 'XPDdata', 'RDSyn', 'NuaaSim']:
+            criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device, self.focal_gamma)
+        elif self.dataset in ['CWRdata', 'PDRdata', 'Carrada_RD', 'CarradaRAC_RD', 'XPDdata', 'RDSyn', 'NuaaSim', 'LSFJamming']:
             signal_type = 'range_doppler'
-            criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device)
+            criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device, self.focal_gamma)
         else:
             raise KeyError(f'Dataset {self.dataset} has not been supported yet.')
         # rd_criterion = define_loss(self.dataset, 'range_doppler', self.custom_loss, self.device)
@@ -100,8 +101,17 @@ class Tester:
             # list_ori_idx1_ad = []
             # list_ori_idx2_ad = []
             # from tqdm import tqdm
+            total_sequences = len(seq_loader)
             for i, sequence_data in enumerate(seq_loader):
-                print('processing: {} / {}'.format(i, len(seq_loader)))
+                if get_rank() == 0:
+                    done = i + 1
+                    bar_width = 30
+                    filled = int(bar_width * done / max(total_sequences, 1))
+                    if filled >= bar_width:
+                        bar = '=' * bar_width
+                    else:
+                        bar = '=' * filled + '>' + '.' * (bar_width - filled - 1)
+                    print(f'\rProcessing sequences [{bar}] {done}/{total_sequences}', end='', flush=True)
                 seq_name, seq = sequence_data
                 if self.dataset == 'CWRdata':
                     path_to_frames = self.paths['CWRdata'] / seq_name[0]
@@ -113,6 +123,8 @@ class Tester:
                     path_to_frames = self.paths['RDSyn'] / seq_name[0]
                 elif self.dataset == 'NuaaSim':
                     path_to_frames = self.paths['NuaaSim'] / seq_name[0]
+                elif self.dataset == 'LSFJamming':
+                    path_to_frames = self.paths['LSFJamming'] / seq_name[0]
                 elif self.dataset in ['Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD']:
                     path_to_frames = self.paths['Carrada'] / seq_name[0]
                 else:
@@ -133,7 +145,7 @@ class Tester:
                 else:
                     sampler_test = torch.utils.data.SequentialSampler(_dataset)
                 # lt@20240301 for pdr dataset, fix batch size to 2.
-                if self.dataset in ['CWRdata', 'Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD', 'XPDdata', 'RDSyn', 'NuaaSim']:
+                if self.dataset in ['CWRdata', 'Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD', 'XPDdata', 'RDSyn', 'NuaaSim', 'LSFJamming']:
                     frame_dataloader = DataLoader(_dataset,
                                                   shuffle=False,
                                                   sampler=sampler_test,
@@ -229,6 +241,9 @@ class Tester:
                             if self.visualizer:
                                 self.visualizer.update_multi_img_masks(rd_pred_grid, rd_gt_grid,
                                                                    iteration)
+            if get_rank() == 0 and total_sequences > 0:
+                print()
+
             self.test_results = dict()
             self.test_results[signal_type] = get_metrics(rd_metrics, np.mean(rd_running_losses),
                                                              [np.mean(sub_loss) for sub_loss

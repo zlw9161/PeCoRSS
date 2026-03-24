@@ -55,6 +55,7 @@ class Model(nn.Module):
         self.numpy_seed = self.cfg['numpy_seed']
         self.nb_classes = self.cfg['nb_classes']
         self.custom_loss = self.cfg['custom_loss']
+        self.focal_gamma = self.cfg.get('focal_gamma', None)
         self.comments = self.cfg['comments']
         self.n_frames = self.cfg['nb_input_channels']
         self.transform_names = self.cfg['transformations'].split(',')
@@ -91,12 +92,12 @@ class Model(nn.Module):
                                               sizes=(self.w_size, self.h_size))
         self._set_seeds()
         # self.net.module.apply(self._init_weights)
-        if self.dataset in ['CWRdata', 'PDRdata', 'Carrada_RD', 'CarradaRAC_RD', 'XPDdata', 'RDSyn', 'NuaaSim']:
+        if self.dataset in ['CWRdata', 'PDRdata', 'Carrada_RD', 'CarradaRAC_RD', 'XPDdata', 'RDSyn', 'NuaaSim', 'LSFJamming']:
             signal_type = 'range_doppler'
-            criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device)
+            criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device, self.focal_gamma)
         elif self.dataset in ['Carrada_RA', 'CarradaRAC_RA']:
             signal_type = 'range_angle'
-            criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device)
+            criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device, self.focal_gamma)
         else:
             raise KeyError(f'Dataset {self.dataset} has not been supported yet.')
         # ra_criterion = define_loss('range_angle', self.custom_loss, self.device)
@@ -152,6 +153,8 @@ class Model(nn.Module):
                     path_to_frames = self.paths['RDSyn'] / seq_name[0]
                 elif self.dataset == 'NuaaSim':
                     path_to_frames = self.paths['NuaaSim'] / seq_name[0]
+                elif self.dataset == 'LSFJamming':
+                    path_to_frames = self.paths['LSFJamming'] / seq_name[0]
                 elif self.dataset in ['Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD']:
                     path_to_frames = self.paths['Carrada'] / seq_name[0]
                 else:
@@ -330,6 +333,15 @@ class Model(nn.Module):
                                                             val_metrics[signal_type]['dice'],
                                                             ))
 
+                            print('[Epoch {}/{}] Val Recall by class: '
+                                  '{}'.format(epoch+1,
+                                              self.nb_epochs,
+                                              val_metrics[signal_type]['recall_by_class']))
+                            print('[Epoch {}/{}] Val Confusion matrix: '
+                                  '{}'.format(epoch+1,
+                                              self.nb_epochs,
+                                              val_metrics[signal_type]['confusion_matrix']))
+
                             # lt @20230522
                             # if val_metrics[signal_type]['dice'] > best_val_dop and iteration > 0:
                             #     best_val_dop = val_metrics[signal_type]['dice']
@@ -385,6 +397,15 @@ class Model(nn.Module):
                                                             self.nb_epochs,
                                                             test_metrics[signal_type]['dice'],
                                                             ))
+
+                            print('[Epoch {}/{}] Test Recall by class: '
+                                  '{}'.format(epoch+1,
+                                              self.nb_epochs,
+                                              test_metrics[signal_type]['recall_by_class']))
+                            print('[Epoch {}/{}] Test Confusion matrix: '
+                                  '{}'.format(epoch+1,
+                                              self.nb_epochs,
+                                              test_metrics[signal_type]['confusion_matrix']))
 
                             self.results['epoch'] = epoch + 1
                             self.results['rd_train_loss'] = rd_train_loss.item()

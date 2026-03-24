@@ -44,6 +44,7 @@ class Tester:
         self.norm_type = self.cfg['norm_type']
         self.distributed = self.cfg['distributed']
         self.num_workers = self.cfg['num_workers']
+        self.cmplx_flag = self.cfg.get('cmplx_flag', False)
         self.paths = Paths().get()
         self.test_results = dict()
 
@@ -73,7 +74,7 @@ class Tester:
         if self.dataset in ['Carrada_RA', 'CarradaRAC_RA']:
             signal_type = 'range_angle'
             criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device)
-        elif self.dataset in ['CWRdata', 'PDRdata', 'Carrada_RD', 'CarradaRAC_RD', 'XPDdata', 'RDSyn']:
+        elif self.dataset in ['CWRdata', 'PDRdata', 'Carrada_RD', 'CarradaRAC_RD', 'XPDdata', 'RDSyn', 'LSFJamming']:
             signal_type = 'range_doppler'
             criterion = define_loss(self.dataset, signal_type, self.custom_loss, self.device)
         else:
@@ -106,8 +107,17 @@ class Tester:
             # list_ori_idx1_ad = []
             # list_ori_idx2_ad = []
             # from tqdm import tqdm
+            total_sequences = len(seq_loader)
             for i, sequence_data in enumerate(seq_loader):
-                print('processing: {} / {}'.format(i, len(seq_loader)))
+                if get_rank() == 0:
+                    done = i + 1
+                    bar_width = 30
+                    filled = int(bar_width * done / max(total_sequences, 1))
+                    if filled >= bar_width:
+                        bar = '=' * bar_width
+                    else:
+                        bar = '=' * filled + '>' + '.' * (bar_width - filled - 1)
+                    print(f'\rProcessing sequences [{bar}] {done}/{total_sequences}', end='', flush=True)
                 seq_name, seq = sequence_data
 
                 if self.dataset == 'CWRdata':
@@ -118,6 +128,8 @@ class Tester:
                     path_to_frames = self.paths['XPDdata'] / seq_name[0]
                 elif self.dataset == 'RDSyn':
                     path_to_frames = self.paths['RDSyn'] / seq_name[0]
+                elif self.dataset == 'LSFJamming':
+                    path_to_frames = self.paths['LSFJamming'] / seq_name[0]
                 elif self.dataset in ['Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD']:
                     path_to_frames = self.paths['Carrada'] / seq_name[0]
                 else:
@@ -130,6 +142,7 @@ class Tester:
                                           path_to_frames,
                                           self.process_signal,
                                           self.n_frames,
+                                          self.cmplx_flag,
                                           transformations,
                                           add_temp)
                 if self.distributed:
@@ -137,7 +150,7 @@ class Tester:
                 else:
                     sampler_test = torch.utils.data.SequentialSampler(_dataset)
                 # lt@20240301 for pdr dataset, fix batch size to 2.
-                if self.dataset in ['CWRdata', 'Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD', 'XPDdata', 'RDSyn']:
+                if self.dataset in ['CWRdata', 'Carrada_RA', 'Carrada_RD', 'CarradaRAC_RA', 'CarradaRAC_RD', 'XPDdata', 'RDSyn', 'LSFJamming']:
                     frame_dataloader = DataLoader(_dataset,
                                                   shuffle=False,
                                                   sampler=sampler_test,
@@ -158,7 +171,10 @@ class Tester:
                     quali_iter_rd = self.n_frames-1
                     quali_iter_ra = self.n_frames-1
                 for j, frame in enumerate(frame_dataloader):
-                    rd_data = frame['rd_matrix'].to(self.device).float()
+                    if self.cmplx_flag:
+                        rd_data = frame['rd_matrix'].to(self.device)
+                    else:
+                        rd_data = frame['rd_matrix'].to(self.device).float()
                     # ra_data = frame['ra_matrix'].to(self.device).float()
                     # ad_data = frame['ad_matrix'].to(self.device).float()
                     rd_mask = frame['rd_mask'].to(self.device).float()
@@ -233,6 +249,9 @@ class Tester:
                                 self.visualizer.update_multi_img_masks(rd_pred_grid, rd_gt_grid,
                                                                    iteration)
             
+            if get_rank() == 0 and total_sequences > 0:
+                print()
+
             self.test_results = dict()
             self.test_results[signal_type] = get_metrics(rd_metrics, np.mean(rd_running_losses),
                                                              [np.mean(sub_loss) for sub_loss

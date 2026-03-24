@@ -3,7 +3,7 @@ import json
 from torch.utils.data import DataLoader
 
 from svrss.utils.paths import Paths
-from svrss.loaders.dataset import CWRdata, PDRdata, Carrada, RDSyn, XPDdata, NuaaSim
+from svrss.loaders.dataset import CWRdata, PDRdata, Carrada, RDSyn, XPDdata, NuaaSim, LSFJamming
 from svrss.loaders.dataloaders import SequenceDataset
 from svrss.utils.distributed_utils import get_rank
 import time
@@ -35,6 +35,8 @@ class Initializer:
             data = XPDdata()
         elif self.cfg['dataset'] == 'NuaaSim':
             data = NuaaSim()
+        elif self.cfg['dataset'] == 'LSFJamming':
+            data = LSFJamming()
         else:
             raise KeyError('Dataset {} has not been supported yet.'.format(self.cfg['dataset']))
         

@@ -32,6 +32,7 @@
  "version": 0,
  "device": "cuda",
  "custom_loss": "ce",
+ "focal_gamma": 2.0,
  "transformations": "hflip,vflip",
  "norm_type": "instance",
  "shuffle": true,

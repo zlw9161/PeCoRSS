@@ -10,6 +10,7 @@ from svrss.learners.model import Model
 from svrss.models import EchMo, rEchMo
 import torch.nn as nn
 import torch
+from svrss.utils.paths import Paths
 from svrss.utils.distributed_utils import init_distributed_mode, get_rank, get_world_size
 
 
@@ -17,7 +18,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--cfg', help='Path to config file.', default='config.json', type=str, required=True)
     parser.add_argument('--dataset', default='Carrada_RD', help='dataset for model training,\
-                        options: Carrada_RD, Carrada_RA, CarradaRAC_RD, CarradaRAC_RA, CWRdata, PDRdata, RDSyn, XPDdata', type=str)
+                        options: Carrada_RD, Carrada_RA, CarradaRAC_RD, CarradaRAC_RA, CWRdata, PDRdata, RDSyn, XPDdata, NuaaSim, LSFJamming', type=str)
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
     parser.add_argument('--sync-bn', dest='sync_bn', help='Use sync batch norm', action='store_true')
     parser.add_argument('--finetune', help='the finetune path of model', action='store_true')
@@ -40,6 +41,8 @@ def main():
         cfg['nb_classes'] = 5
     elif cfg['dataset'] in ['XPDdata', 'RDSyn', 'NuaaSim']:
         cfg['nb_classes'] = 2
+    elif cfg['dataset'] == 'LSFJamming':
+        cfg['nb_classes'] = 7
     else:
         raise KeyError('Dataset {} has not been supported yet.'.format(cfg['dataset']))
     
@@ -54,7 +57,10 @@ def main():
     model_cfg = EchMo_CFG()
     model_cfg.task_name = data['cfg']['task_name']
     model_cfg.coef_path = 'coefs'
-    model_cfg.dataset_path = '/data/PeCoLab/datasets/NuaaSim'
+    if cfg['dataset'] == 'LSFJamming':
+        model_cfg.dataset_path = str(Paths().get()['LSFJamming'])
+    else:
+        model_cfg.dataset_path = '/data/PeCoLab/datasets/NuaaSim'
     # data setting
     model_cfg.n_pulse = data['cfg']['w_size']
     model_cfg.n_range = data['cfg']['h_size']
@@ -111,7 +117,7 @@ def main():
     if args.distributed:
         # Keep all ranks aligned after rank0-only setup such as THOP profiling.
         torch.distributed.barrier()
-    print('----------------------')
+    print('---------------------------------------------------')
 
     if args.distributed and args.sync_bn:
         net = torch.nn.SyncBatchNorm.convert_sync_batchnorm(net)

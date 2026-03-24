@@ -17,6 +17,8 @@ if __name__ == '__main__':
                         help='Path to the Nuaa synthesis radar dataset.')
     parser.add_argument('--xpd', default='/home/liwenzhang/PeCoLab/DataSets/XPDData/S70-20240717-npy',
                         help='Path to the synthesis radar dataset.')
+    parser.add_argument('--lsf_jamming', default='/data1/datasets/LSFJamming',
+                        help='Path to the LSFJamming dataset.')
     parser.add_argument('--logs', default='/home/liwenzhang/PeCoLab/logs',
                         help='Path to the save the logs and models.')
     args = parser.parse_args()
@@ -28,6 +30,7 @@ if __name__ == '__main__':
     configurable.set('data', 'rdsyn', args.rdsyn)
     configurable.set('data', 'nuaasim', args.nuaasim)
     configurable.set('data', 'xpd', args.xpd)
+    configurable.set('data', 'lsf_jamming', args.lsf_jamming)
     configurable.set('data', 'logs', args.logs)
     with open(config_path, 'w') as fp:
         configurable.config.write(fp)

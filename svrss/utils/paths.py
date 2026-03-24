@@ -22,6 +22,7 @@ class Paths(Configurable):
         self.paths['RDSyn'] = Path(self.config['data']['rdsyn'])
         self.paths['NuaaSim'] = Path(self.config['data']['nuaasim'])
         self.paths['XPDdata'] = Path(self.config['data']['xpd'])
+        self.paths['LSFJamming'] = Path(self.config['data']['lsf_jamming'])
 
     def get(self):
         return self.paths

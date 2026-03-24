@@ -4,6 +4,51 @@ from svrss.utils.paths import Paths
 import numpy as np
 
 
+class LSFJamming:
+    """Class to load LSFJamming dataset"""
+
+    def __init__(self):
+        self.paths = Paths().get()
+        self.lsfdata = self.paths['LSFJamming']
+        self.data_seq_ref = self._load_data_seq_ref()
+        self.annotations = self._load_dataset_ids()
+        self.train = dict()
+        self.validation = dict()
+        self.test = dict()
+        self.ratio_spilt = [0.7, 0.2, 0.1]
+        self._split()
+
+    def _load_data_seq_ref(self):
+        path = self.lsfdata / 'data_seq_ref.json'
+        with open(path, 'r', encoding='UTF-8') as fp:
+            data_seq_ref = json.load(fp)
+        return data_seq_ref
+
+    def _load_dataset_ids(self):
+        path = self.lsfdata / 'light_dataset_frame_oriented.json'
+        with open(path, 'r', encoding='GBK') as fp:
+            annotations = json.load(fp)
+        return annotations
+
+    def _split(self):
+        cum_ratio = np.cumsum(self.ratio_spilt)
+        for sequence in self.data_seq_ref.keys():
+            num_frames = len(self.annotations[sequence])
+            self.train[sequence] = self.annotations[sequence][0:int(num_frames * cum_ratio[0])]
+            self.validation[sequence] = self.annotations[sequence][
+                int(num_frames * cum_ratio[0]):int(num_frames * cum_ratio[1])]
+            self.test[sequence] = self.annotations[sequence][int(num_frames * cum_ratio[1]):]
+
+    def get(self, split):
+        if split == 'Train':
+            return self.train
+        if split == 'Validation':
+            return self.validation
+        if split == 'Test':
+            return self.test
+        raise TypeError('Type {} is not supported for splits.'.format(split))
+
+
 class CWRdata:
     """Class to load CWRdata dataset"""
 

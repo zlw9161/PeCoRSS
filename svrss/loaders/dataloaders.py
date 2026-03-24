@@ -7,7 +7,7 @@ from pathlib import Path
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
-from svrss.loaders.dataset import CWRdata, XPDdata, RDSyn, NuaaSim
+from svrss.loaders.dataset import CWRdata, XPDdata, RDSyn, NuaaSim, LSFJamming
 from svrss.utils.paths import Paths
 
 
@@ -120,18 +120,21 @@ class PeCoRSVDataset(Dataset):
         # ad_matrices = list()
         rd_mask = np.load(os.path.join(self.path_to_annots, init_frame_name,
                                        self.signal_type + '.npy'))
+        if self.dataset_type == 'LSFJamming':
+            rd_mask = torch.nn.functional.one_hot(torch.from_numpy(rd_mask).long(), num_classes=7)
+            rd_mask = rd_mask.permute(2, 0, 1).float().numpy()
         # ra_mask = np.load(os.path.join(self.path_to_annots, init_frame_name,
         #                                'range_angle.npy'))
         for frame_name in frame_names:
             if self.dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
                 if self.process_signal:
                     rd_matrix = np.load(os.path.join(self.path_to_frames,
-                                                    self.signal_type + '_processed',
-                                                    frame_name + '.npy'))
+                                                     self.signal_type + '_processed',
+                                                     frame_name + '.npy'))
                 else:
                     rd_matrix = np.load(os.path.join(self.path_to_frames,
-                                                    self.signal_type + '_raw',
-                                                    frame_name + '.npy'))
+                                                     self.signal_type + '_raw',
+                                                     frame_name + '.npy'))
             elif self.dataset_type == 'XPDdata':
                 rd_matrix = np.load(os.path.join(self.path_to_frames,
                                                  self.signal_type + '_mtdData_amp',
@@ -139,14 +142,25 @@ class PeCoRSVDataset(Dataset):
             elif self.dataset_type == 'NuaaSim':
                 if self.cmplx_flag:
                     rd_matrix = np.load(os.path.join(self.path_to_frames,
-                                                    self.signal_type + '_echo',
-                                                    frame_name + '.npy'))
+                                                     self.signal_type + '_echo',
+                                                     frame_name + '.npy'))
                     # if len(rd_matrix.size) == 4:
                     #     rd_matrix = rd_matrix[0,...]
                 else:
                     rd_matrix = np.load(os.path.join(self.path_to_frames,
-                                                    self.signal_type + '_mtdData_amp',
-                                                    frame_name + '.npy'))
+                                                     self.signal_type + '_mtdData_amp',
+                                                     frame_name + '.npy'))
+            elif self.dataset_type == 'LSFJamming':
+                if self.cmplx_flag:
+                    rd_matrix_temp = np.load(os.path.join(self.path_to_frames,
+                                                          self.signal_type + '_echo',
+                                                          frame_name + '.npy'))
+                    rd_matrix = rd_matrix_temp[0, ...] + 1j * rd_matrix_temp[1, ...]
+                else:
+                    rd_matrix_temp = np.load(os.path.join(self.path_to_frames,
+                                                          self.signal_type + '_MTD',
+                                                          frame_name + '.npy'))
+                    rd_matrix = np.abs(rd_matrix_temp[0, ...] + 1j * rd_matrix_temp[1, ...])
             else:
                 rd_matrix = np.load(os.path.join(self.path_to_frames,
                                                  self.signal_type + '_numpy',
