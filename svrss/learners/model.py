@@ -66,6 +66,23 @@ class Model(nn.Module):
         self.num_workers = self.cfg['num_workers']
         self.cmplx_flag = self.cfg['cmplx_flag']
         self.rank = get_rank()
+        self.lmf_v6_curriculum_enable = self.cfg.get('lmf_v6_curriculum_enable', False)
+        self.lmf_v6_freeze_ratio = float(self.cfg.get('lmf_v6_freeze_ratio', 0.1))
+        self.lmf_v6_transition_ratio = float(self.cfg.get('lmf_v6_transition_ratio', 0.4))
+        self.lmf_v6_prior_reg_start = float(self.cfg.get('lmf_v6_prior_reg_start', 1e-2))
+        self.lmf_v6_prior_reg_end = float(self.cfg.get('lmf_v6_prior_reg_end', 1e-4))
+        self.lmf_v6_prior_lr_scale = float(self.cfg.get('lmf_v6_prior_lr_scale', 0.1))
+        self.lmf_v6_residual_lr_scale_start = float(self.cfg.get('lmf_v6_residual_lr_scale_start', 0.3))
+        self.lmf_v6_residual_lr_scale_end = float(self.cfg.get('lmf_v6_residual_lr_scale_end', 1.0))
+        self.lmf_v6_residual_alpha_start = float(self.cfg.get('lmf_v6_residual_alpha_start', 0.1))
+        self.lmf_v6_residual_alpha_end = float(self.cfg.get('lmf_v6_residual_alpha_end', 1.0))
+        self._lmf_prior_params = []
+        self._lmf_residual_params = []
+        self._lmf_prior_modules = []
+        self._lmf_residual_modules = []
+        self._lmf_prior_reg_lambda = 0.0
+        if self.lmf_v6_curriculum_enable:
+            self._setup_lmf_v6_curriculum()
         if self.rank == 0:
             self.writer = SummaryWriter(self.paths['writer'])
             self.visualizer = TensorboardMultiLossVisualizer(self.writer)
@@ -108,7 +125,10 @@ class Model(nn.Module):
         # ra_running_losses = list()
         # ra_running_global_losses = [list(), list()]
         # coherence_running_losses = list()
-        optimizer = optim.Adam(self.net.parameters(), lr=self.lr)
+        if self.lmf_v6_curriculum_enable and (self._lmf_prior_params or self._lmf_residual_params):
+            optimizer = self._build_lmf_v6_optimizer()
+        else:
+            optimizer = optim.Adam(self.net.parameters(), lr=self.lr)
         # lt @20230417
         if self.schedular_type == 'exp':
             scheduler = ExponentialLR(optimizer, gamma=0.9)
@@ -140,6 +160,8 @@ class Model(nn.Module):
             else:
                 if epoch != 0 and epoch < self.T_max:
                     scheduler.step()
+            if self.lmf_v6_curriculum_enable and (self._lmf_prior_params or self._lmf_residual_params):
+                self._apply_lmf_v6_curriculum(epoch, optimizer)
             # for _, sequence_data in enumerate(tqdm(train_loader)):
             for _, sequence_data in enumerate(train_loader):
                 seq_name, seq = sequence_data
@@ -215,6 +237,10 @@ class Model(nn.Module):
                     #              for c in ra_criterion]
                     # ra_loss = torch.mean(torch.stack(ra_losses))
                     loss = rd_loss
+                    if self.lmf_v6_curriculum_enable and self._lmf_prior_modules:
+                        prior_penalty = self._compute_lmf_prior_penalty()
+                        if prior_penalty is not None and self._lmf_prior_reg_lambda > 0:
+                            loss = loss + self._lmf_prior_reg_lambda * prior_penalty
 
                     rd_losses_reduced = reduce_value(rd_losses)
                     rd_loss_reduced = reduce_value(rd_loss)
@@ -337,10 +363,11 @@ class Model(nn.Module):
                                   '{}'.format(epoch+1,
                                               self.nb_epochs,
                                               val_metrics[signal_type]['recall_by_class']))
-                            print('[Epoch {}/{}] Val Confusion matrix: '
-                                  '{}'.format(epoch+1,
-                                              self.nb_epochs,
-                                              val_metrics[signal_type]['confusion_matrix']))
+                            print('[Epoch {}/{}] Val Confusion matrix:\n{}'.format(
+                                epoch + 1,
+                                self.nb_epochs,
+                                self._format_confusion_matrix(val_metrics[signal_type]['confusion_matrix'])
+                            ))
 
                             # lt @20230522
                             # if val_metrics[signal_type]['dice'] > best_val_dop and iteration > 0:
@@ -402,10 +429,11 @@ class Model(nn.Module):
                                   '{}'.format(epoch+1,
                                               self.nb_epochs,
                                               test_metrics[signal_type]['recall_by_class']))
-                            print('[Epoch {}/{}] Test Confusion matrix: '
-                                  '{}'.format(epoch+1,
-                                              self.nb_epochs,
-                                              test_metrics[signal_type]['confusion_matrix']))
+                            print('[Epoch {}/{}] Test Confusion matrix:\n{}'.format(
+                                epoch + 1,
+                                self.nb_epochs,
+                                self._format_confusion_matrix(test_metrics[signal_type]['confusion_matrix'])
+                            ))
 
                             self.results['epoch'] = epoch + 1
                             self.results['rd_train_loss'] = rd_train_loss.item()
@@ -442,6 +470,30 @@ class Model(nn.Module):
                 nn.init.uniform_(m.weight, 0., 1.)
                 nn.init.constant_(m.bias, 0.)
 
+    def _format_confusion_matrix(self, matrix, precision=4):
+        cm = np.asarray(matrix)
+        if cm.ndim != 2:
+            return str(cm)
+
+        n_rows, n_cols = cm.shape
+        cell_width = 11
+        header = ' ' * 6 + ''.join('{:>{w}}'.format('c{}'.format(j), w=cell_width)
+                                   for j in range(n_cols))
+        lines = [header]
+
+        is_int = np.issubdtype(cm.dtype, np.integer)
+        for i in range(n_rows):
+            row_label = 'r{:<3} '.format(i)
+            row_cells = []
+            for v in cm[i]:
+                if is_int:
+                    row_cells.append('{:>{w}d}'.format(int(v), w=cell_width))
+                else:
+                    row_cells.append('{:>{w}.{p}f}'.format(float(v), w=cell_width, p=precision))
+            lines.append(row_label + ''.join(row_cells))
+
+        return '\n'.join(lines)
+
     def _save_results(self, names):
         for name in names:
             results_path = self.paths['results'] / (name + '_' + 'results.json')
@@ -457,3 +509,111 @@ class Model(nn.Module):
         torch.manual_seed(self.torch_seed)
         np.random.seed(self.numpy_seed)
         random.seed(self.numpy_seed)
+
+    def _get_model_core(self):
+        return self.net.module if hasattr(self.net, 'module') else self.net
+
+    def _setup_lmf_v6_curriculum(self):
+        model_core = self._get_model_core()
+        for module in model_core.modules():
+            if module.__class__.__name__ not in (
+                'Leanable_Match_FilterV6',
+                'Learnable_Match_FilterV7',
+                'LMF_Layer_Parallel',
+            ):
+                continue
+            if getattr(module, 'residual_mode', False):
+                self._lmf_residual_modules.append(module)
+                self._lmf_residual_params.extend([p for p in module.parameters() if p.requires_grad])
+            else:
+                self._lmf_prior_modules.append(module)
+                self._lmf_prior_params.extend([p for p in module.parameters() if p.requires_grad])
+
+    def _build_lmf_v6_optimizer(self):
+        prior_ids = {id(p) for p in self._lmf_prior_params}
+        residual_ids = {id(p) for p in self._lmf_residual_params}
+        model_core = self._get_model_core()
+        base_params = [p for p in model_core.parameters()
+                       if p.requires_grad and id(p) not in prior_ids and id(p) not in residual_ids]
+        param_groups = []
+        if base_params:
+            param_groups.append({'params': base_params, 'lr': self.lr, 'group_name': 'base'})
+        if self._lmf_prior_params:
+            param_groups.append({'params': self._lmf_prior_params,
+                                 'lr': self.lr * self.lmf_v6_prior_lr_scale,
+                                 'group_name': 'lmf_prior'})
+        if self._lmf_residual_params:
+            param_groups.append({'params': self._lmf_residual_params,
+                                 'lr': self.lr * self.lmf_v6_residual_lr_scale_start,
+                                 'group_name': 'lmf_residual'})
+        return optim.Adam(param_groups, lr=self.lr)
+
+    def _apply_lmf_v6_curriculum(self, epoch, optimizer):
+        if self.nb_epochs <= 1:
+            progress = 1.0
+        else:
+            progress = epoch / float(self.nb_epochs - 1)
+
+        freeze_end = max(0.0, min(self.lmf_v6_freeze_ratio, 1.0))
+        transition_end = max(freeze_end, min(self.lmf_v6_transition_ratio, 1.0))
+
+        if progress < freeze_end:
+            stage = 0
+            stage_t = 0.0
+        elif progress < transition_end:
+            stage = 1
+            stage_t = (progress - freeze_end) / max(transition_end - freeze_end, 1e-8)
+        else:
+            stage = 2
+            stage_t = (progress - transition_end) / max(1.0 - transition_end, 1e-8)
+
+        freeze_prior = stage == 0
+
+        if stage == 0:
+            prior_lambda = self.lmf_v6_prior_reg_start
+            residual_alpha = self.lmf_v6_residual_alpha_start
+            residual_lr_scale = self.lmf_v6_residual_lr_scale_start
+        elif stage == 1:
+            prior_lambda = self.lmf_v6_prior_reg_start + stage_t * (self.lmf_v6_prior_reg_end - self.lmf_v6_prior_reg_start)
+            residual_alpha = self.lmf_v6_residual_alpha_start + stage_t * (0.5 - self.lmf_v6_residual_alpha_start)
+            residual_lr_scale = self.lmf_v6_residual_lr_scale_start + stage_t * (0.7 - self.lmf_v6_residual_lr_scale_start)
+        else:
+            prior_lambda = self.lmf_v6_prior_reg_end * (1.0 - stage_t)
+            residual_alpha = 0.5 + stage_t * (self.lmf_v6_residual_alpha_end - 0.5)
+            residual_lr_scale = 0.7 + stage_t * (self.lmf_v6_residual_lr_scale_end - 0.7)
+
+        self._lmf_prior_reg_lambda = max(prior_lambda, 0.0)
+        for module in self._lmf_residual_modules:
+            module.residual_scale = float(max(residual_alpha, 0.0))
+
+        base_lr = None
+        for group in optimizer.param_groups:
+            if group.get('group_name') == 'base':
+                base_lr = group['lr']
+                break
+        if base_lr is None and optimizer.param_groups:
+            base_lr = optimizer.param_groups[0]['lr']
+        if base_lr is None:
+            return
+
+        prior_lr_scale = 0.0 if freeze_prior else self.lmf_v6_prior_lr_scale
+
+        for group in optimizer.param_groups:
+            gname = group.get('group_name')
+            if gname == 'lmf_prior':
+                group['lr'] = base_lr * prior_lr_scale
+            elif gname == 'lmf_residual':
+                group['lr'] = base_lr * residual_lr_scale
+
+    def _compute_lmf_prior_penalty(self):
+        if not self._lmf_prior_modules:
+            return None
+        penalty = None
+        for module in self._lmf_prior_modules:
+            if module.prior_kernel_real is None or module.prior_kernel_imag is None:
+                continue
+            loss_real = torch.mean((module.kernel_real - module.prior_kernel_real) ** 2)
+            loss_imag = torch.mean((module.kernel_imag - module.prior_kernel_imag) ** 2)
+            item = loss_real + loss_imag
+            penalty = item if penalty is None else (penalty + item)
+        return penalty

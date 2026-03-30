@@ -4,7 +4,7 @@
 
 **Developed by PeCoLab of ISTA@CASIC**
 
-[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![Version](https://img.shields.io/badge/Version-1.0.5-brightgreen.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
+[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![Version](https://img.shields.io/badge/Version-1.0.6-brightgreen.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
 
 </div>
 
@@ -632,7 +632,7 @@ If you find PeCoRSS useful in your research, please consider citing the followin
 | Field | Info |
 |:------|:-----|
 | **Package** | `pecorss` |
-| **Version** | `1.0.5` |
+| **Version** | `1.0.6` |
 | **License** | Apache 2.0 |
 | **Repository** | [https://github.com/zlw9161](https://github.com/zlw9161) |
 | **Contact** | lwzhang9161@126.com |
@@ -659,28 +659,44 @@ For detailed release notes and version history, see [CHANGELOG.md](./CHANGELOG.m
 
 ---
 
-## 📝 Update Log (v1.0.5)
+## 📝 Update Log (v1.0.6)
 
-### EchMo LMF_V6 Upgrade
+### LMF_V7 and Chain-Parallel Upgrade
 
-- Added `Leanable_Match_FilterV6` in `svrss/models/echmo_debug.py`.
-- The first LMF layer keeps prior-guided matched-filter initialization, while deeper layers use residual correction instead of repeatedly re-applying the same prior.
-- EchMo RD translation was updated to use amp+phase+I/Q features for the downstream real-valued translator.
-- Added multiple NuaaSim EchMo configs for scale validation, ablation, and recall-oriented tuning.
+- Added `Learnable_Match_FilterV7` in `svrss/models/echmo_debug.py` as a latency-optimized LMF implementation.
+- Added `LMF_Layer_Parallel` and `LMF_Chain_Parallel` to support true chain-parallel LMF execution.
+- Added configurable LMF switches in runtime (`lmf_impl`, `lmf_chain_impl`) and integrated them into EchMo/EchMoWide and `run_echmo.py`.
+- Kept compatibility with the existing V6 training semantics (prior + residual mode behavior).
 
-### LSFJamming Support in `svrss`
+### Compute Report and Equivalence Updates
 
-- Added dataset path setup and runtime path registration for `LSFJamming`.
-- Added `LSFJamming` dataset loading, frame routing, inference/test integration, normalization stats, and weight files in `svrss`.
-- Aligned LSFJamming mask handling to the observed 7-class labels and synced the customized `lsf_wce` loss into `svrss`.
+- Added `MLDC` vs `MLDC_Parallel` numerical equivalence section to `svrss/readme/EchMo_Backbone_Compute_Report.md`.
+- Added `LMF_V6` vs `LMF_V7` vs `LMF_Chain_Parallel` equivalence and latency comparisons to the same report.
+- Added standalone LMF technical report: `svrss/readme/LMF_V7_Chain_Parallel_Modification_Report.md`.
 
-### Evaluation and Training Diagnostics
+### Scale Scheme Updates (EchMo Family)
 
-- Replaced verbose `processing: n / total` logging with a compact single-line progress bar in test loops.
-- Added recall-by-class and confusion-matrix logging during validation and test to make foreground failure modes easier to inspect.
-- Added configurable `focal_gamma` support for focal-based losses in JSON configs.
+- Completed scale-scheme rollout for EchMo family variants under `svrss/config_files/`.
+- Added/updated the following scale configs:
+  - `echmo_itc_scale.json` (base scale)
+  - `echmo_wide_itc_scale.json`
+  - `echmo_deep_itc_scale.json`
+  - `echmo_memo_itc_scale.json`
+  - `echmo_4moe_itc_scale.json`
+  - `echmo_itc_scale_lmf-v7.json`
+  - `echmo_itc_scale_lmf_chain_parallel.json`
+  - `echmo_itc_scale_lmf1.json`
+  - `echmo_ablation_lmf_layers2_scale.json`
+  - `echmo_ablation_ldc_channels4_scale.json`
+- Added corresponding architecture/compute notes in `svrss/readme/` for scale variants.
+
+### Documentation and Repo Organization
+
+- Moved `svrss` root-level markdown technical notes into `svrss/readme/`.
+- Standardized newly added technical notes to English for better public readability.
+- Unified class naming in parallel LMF path (`LMF_Layer_Parallel`) to keep architecture naming concise and consistent.
 
 ### Notes
 
 - Detailed release notes are available in [CHANGELOG.md](./CHANGELOG.md).
-- Current package version is `1.0.5`.
+- Current package version is `1.0.6`.

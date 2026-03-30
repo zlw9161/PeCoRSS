@@ -7,7 +7,7 @@ import json
 from svrss.utils.functions import count_params
 from svrss.learners.initializer import Initializer
 from svrss.learners.model import Model
-from svrss.models import EchMo, rEchMo
+from svrss.models import EchMo, EchMo4MoE, EchMoDeep, EchMoMemo, EchMoWide, rEchMo
 import torch.nn as nn
 import torch
 from svrss.utils.paths import Paths
@@ -72,23 +72,53 @@ def main():
     model_cfg.lmf_channels = data['cfg']['lmf_channels']
     model_cfg.lmf_layers = data['cfg']['lmf_layers']
     model_cfg.lmf_coefs = data['cfg']['lmf_coefs']
+    model_cfg.lmf_impl = data['cfg'].get('lmf_impl', 'v6')
+    model_cfg.lmf_chain_impl = data['cfg'].get('lmf_chain_impl', 'serial')
     # mldc config
     model_cfg.ldc_channels = data['cfg']['ldc_channels']
     model_cfg.ldc_orders = data['cfg']['ldc_orders']
+    model_cfg.mldc_impl = data['cfg'].get('mldc_impl', 'serial')
     # gdf  config
     model_cfg.df_channels = data['cfg']['nb_doppler']
     # global settings
     model_cfg.activation = data['cfg']['activation']
     model_cfg.bias = data['cfg']['bias']
+    # wide model optional settings
+    model_cfg.wide_groups = data['cfg'].get('wide_groups', 4)
+    model_cfg.wide_rank = data['cfg'].get('wide_rank', 32)
+    model_cfg.wide_share_mldc = data['cfg'].get('wide_share_mldc', True)
+    model_cfg.wide_fuse_residual = data['cfg'].get('wide_fuse_residual', True)
+    model_cfg.deep_stage2_enable = data['cfg'].get('deep_stage2_enable', True)
+    model_cfg.deep_stage2_range_scale = data['cfg'].get('deep_stage2_range_scale', 0.5)
+    model_cfg.deep_stage2_pulse_scale = data['cfg'].get('deep_stage2_pulse_scale', 1.0)
+    model_cfg.deep_stage2_chain_scale = data['cfg'].get('deep_stage2_chain_scale', 1.0)
+    model_cfg.deep_stage2_lmf_channel_scale = data['cfg'].get('deep_stage2_lmf_channel_scale', 1.0)
+    model_cfg.deep_stage2_ldc_channel_scale = data['cfg'].get('deep_stage2_ldc_channel_scale', 1.0)
+    model_cfg.memo_enable = data['cfg'].get('memo_enable', True)
+    model_cfg.memo_beta = data['cfg'].get('memo_beta', 0.8)
+    model_cfg.memo_gamma = data['cfg'].get('memo_gamma', 0.4)
+    model_cfg.memo_use_state_proj = data['cfg'].get('memo_use_state_proj', True)
+    model_cfg.moe_num_experts = data['cfg'].get('moe_num_experts', 4)
+    model_cfg.moe_topk = data['cfg'].get('moe_topk', 2)
+    model_cfg.moe_gate_hidden = data['cfg'].get('moe_gate_hidden', 32)
+    model_cfg.moe_temperature = data['cfg'].get('moe_temperature', 1.0)
+    model_cfg.moe_dropout = data['cfg'].get('moe_dropout', 0.0)
 
     add_temp = False
     if cfg['model'] == 'echmo':
         net = EchMo(configs=model_cfg)
+    elif cfg['model'] == 'echmo_deep':
+        net = EchMoDeep(configs=model_cfg)
+    elif cfg['model'] == 'echmo_memo':
+        net = EchMoMemo(configs=model_cfg)
+    elif cfg['model'] == 'echmo_4moe':
+        net = EchMo4MoE(configs=model_cfg)
+    elif cfg['model'] == 'echmo_wide':
+        net = EchMoWide(configs=model_cfg)
     elif cfg['model'] == 'rechmo':
         net = rEchMo(configs=model_cfg)
     elif cfg['model'] == 'techmo':
-        net = tEchMo(configs=model_cfg)
-        add_temp = True
+        raise NotImplementedError('techmo is referenced but not implemented in this entrypoint.')
     else:
         print('Please check model NAME !!!')
 
@@ -133,7 +163,7 @@ def main():
     if args.distributed:
         net = torch.nn.parallel.DistributedDataParallel(net)
     
-    if cfg['model'] in ['mvnet', 'fcn8s', 'unet', 'deeplabv3plus', 'kuradnet', 'kuradnet_wskip', 'pkcin4any_2d', 'ecoss', 'echmo', 'rechmo']:
+    if cfg['model'] in ['mvnet', 'fcn8s', 'unet', 'deeplabv3plus', 'kuradnet', 'kuradnet_wskip', 'pkcin4any_2d', 'ecoss', 'echmo', 'echmo_4moe', 'echmo_deep', 'echmo_memo', 'echmo_wide', 'rechmo']:
         Model(net, data).train(add_temp=False)
     else:
         Model(net, data).train(add_temp=True)

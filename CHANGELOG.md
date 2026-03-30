@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.0.6] - 2026-03-30
+
+### Added
+
+- Added `Learnable_Match_FilterV7` in `svrss/models/echmo_debug.py` as a latency-optimized independent LMF implementation.
+- Added chain-parallel LMF execution path:
+  - `LMF_Layer_Parallel`
+  - `LMF_Chain_Parallel`
+- Added LMF backend and chain-execution switches in runtime configs:
+  - `lmf_impl` (`v6` / `v7`)
+  - `lmf_chain_impl` (`serial` / `parallel`)
+- Added new configs for V7 and chain-parallel experiments in `svrss/config_files/`.
+- Added and organized EchMo scale-scheme configs in `svrss/config_files/`, including:
+  - `echmo_itc_scale.json`
+  - `echmo_wide_itc_scale.json`
+  - `echmo_deep_itc_scale.json`
+  - `echmo_memo_itc_scale.json`
+  - `echmo_4moe_itc_scale.json`
+  - `echmo_itc_scale_lmf-v7.json`
+  - `echmo_itc_scale_lmf_chain_parallel.json`
+- Added standalone LMF modification report:
+  - `svrss/readme/LMF_V7_Chain_Parallel_Modification_Report.md`
+
+### Changed
+
+- Refactored EchMo and EchMoWide to support configurable serial/parallel LMF chain execution.
+- Completed scale-scheme rollout for EchMo family variants (base / wide / deep / memo / 4moe) with aligned ITC-scale config naming.
+- Updated LMF serial chain accumulation to list + single `torch.cat` to reduce unnecessary concat overhead.
+- Moved root-level `svrss` markdown technical notes into `svrss/readme/` for cleaner repository structure.
+- Standardized newly added technical markdown notes to English for public release consistency.
+
+### Fixed
+
+- Fixed temporary syntax/indentation issues introduced during LMF parallel-layer refactor.
+- Fixed class-name consistency by renaming parallel LMF backend class to `LMF_Layer_Parallel`.
+- Fixed curriculum class-discovery coverage for new LMF modules in `svrss/learners/model.py`.
+
+### Benchmarks
+
+- Added MLDC numerical equivalence results (`MLDC` vs `MLDC_Parallel`) to `svrss/readme/EchMo_Backbone_Compute_Report.md`.
+- Added LMF mode equivalence and latency comparison (`LMF_V6`, `LMF_V7`, `LMF_Chain_Parallel`) to `svrss/readme/EchMo_Backbone_Compute_Report.md`.
+
+### Version
+
+- Project version bumped to `1.0.6` in:
+  - `README.md`
+  - `setup.py`
+  - `CHANGELOG.md`
+
 ## [1.0.5] - 2026-03-24
 
 ### Added

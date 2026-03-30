@@ -163,6 +163,24 @@ class Leanable_Match_FilterV5(nn.Module):
 
 
 class Leanable_Match_FilterV6(nn.Module):
+    # LMF with learnable kernels, initialized w/ MF, optional bias, activation, and residual connection. 
+    # Residual mode requires in_ch == out_ch.
+    # Added residual_mode flag to enable/disable residual connection, and corresponding kernel initialization.
+    # When residual_mode is True, kernels are initialized to zero and learn to deviate from identity mapping. 
+    # When False, kernels are initialized to MF and learn freely.
+    # LMF_V6 requires fine-tuning strategy to achieve good performance. 
+    # Curriculum learning is recommended:
+    # - starting with freezing the LMF kernels and gradually unfreezing them,
+    # - while also adjusting the learning rates for the prior and residual components if using residual mode. 
+    # lmf_curriculum_enable: whether to use curriculum learning for LMF_V6, which includes hyperparameters:
+    # - freeze: if epoch < total_epochs * freeze_ratio, freeze the LMF kernels; else unfreeze.
+    # - transition: if epoch < total_epochs * transition_ratio, scale the lr of LMF kernels by a factor (e.g., 0.1); else use the base lr.
+    # - learning rate scaling:
+    #   - prior: if residual mode, use a smaller learning rate for the prior (initialized with MF) to prevent it from 
+    #       deviating too much from the useful MF initialization.
+    #   - residual: if residual mode, you may want to start with a smaller learning rate for the residual kernels
+    #       since they are initialized to zero and need to learn from scratch, 
+    #       and then increase it as training progresses. @zlw 20260325
     def __init__(self, k_size, in_ch, out_ch, lmf_coef, activation='relu', bias=True, residual_mode=False):
         super(Leanable_Match_FilterV6, self).__init__()
         self.k_size = k_size
@@ -173,6 +191,7 @@ class Leanable_Match_FilterV6(nn.Module):
         self.activation = activation
         self.bias = bias
         self.residual_mode = residual_mode
+        self.residual_scale = 1.0
         if self.residual_mode:
             if self.in_ch != self.out_ch:
                 raise ValueError('Residual LMF layers require in_ch == out_ch.')
@@ -181,6 +200,12 @@ class Leanable_Match_FilterV6(nn.Module):
             kernel_real, kernel_imag = self.init_prior_kernels()
         self.kernel_real = nn.Parameter(kernel_real)
         self.kernel_imag = nn.Parameter(kernel_imag)
+        if not self.residual_mode:
+            self.register_buffer('prior_kernel_real', kernel_real.detach().clone())
+            self.register_buffer('prior_kernel_imag', kernel_imag.detach().clone())
+        else:
+            self.prior_kernel_real = None
+            self.prior_kernel_imag = None
         if self.bias:
             self.bias_real = nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
             self.bias_imag = nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
@@ -215,7 +240,99 @@ class Leanable_Match_FilterV6(nn.Module):
         x_filtered = self._complex_conv(x)
         if self.residual_mode:
             x_residual = self.cmplx_relu(x_filtered)
-            return x + x_residual
+            return x + self.residual_scale * x_residual
+        return self.cmplx_relu(x_filtered)
+
+
+class Learnable_Match_FilterV7(nn.Module):
+    """Latency-optimized independent LMF implementation.
+
+    Learnable_Match_FilterV7 keeps V6 behavior (prior/residual modes + curriculum-compatible
+    attributes) while reducing 4 real-valued conv calls to 1 by packing
+    complex convolution into a single real conv2d weight bank.
+    """
+
+    def __init__(self, k_size, in_ch, out_ch, lmf_coef, activation='relu', bias=True, residual_mode=False):
+        super(Learnable_Match_FilterV7, self).__init__()
+        self.k_size = k_size
+        self.stride = 1
+        self.in_ch = in_ch
+        self.out_ch = out_ch
+        self.mf = lmf_coef.view(1, 1, 1, self.k_size)
+        self.activation = activation
+        self.bias = bias
+        self.residual_mode = residual_mode
+        self.residual_scale = 1.0
+
+        if self.residual_mode:
+            if self.in_ch != self.out_ch:
+                raise ValueError('Residual LMF layers require in_ch == out_ch.')
+            kernel_real, kernel_imag = self.init_residual_kernels()
+        else:
+            kernel_real, kernel_imag = self.init_prior_kernels()
+
+        self.kernel_real = nn.Parameter(kernel_real)
+        self.kernel_imag = nn.Parameter(kernel_imag)
+
+        if not self.residual_mode:
+            self.register_buffer('prior_kernel_real', kernel_real.detach().clone())
+            self.register_buffer('prior_kernel_imag', kernel_imag.detach().clone())
+        else:
+            self.prior_kernel_real = None
+            self.prior_kernel_imag = None
+
+        if self.bias:
+            self.bias_real = nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+            self.bias_imag = nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+        else:
+            self.register_parameter('bias_real', None)
+            self.register_parameter('bias_imag', None)
+
+        self.cause_padding = torch.nn.ZeroPad2d(padding=(0, self.k_size - 1, 0, 0))
+        self.cmplx_relu = ComplexReLU(self.activation)
+
+    def init_prior_kernels(self):
+        real_kernel = self.mf.real.broadcast_to(self.out_ch, self.in_ch, 1, self.k_size)
+        imag_kernel = self.mf.imag.broadcast_to(self.out_ch, self.in_ch, 1, self.k_size)
+        return real_kernel.clone().contiguous(), imag_kernel.clone().contiguous()
+
+    def init_residual_kernels(self):
+        shape = (self.out_ch, self.in_ch, 1, self.k_size)
+        real_kernel = torch.zeros(shape, dtype=torch.float32)
+        imag_kernel = torch.zeros(shape, dtype=torch.float32)
+        return real_kernel, imag_kernel
+
+    def _build_kernel_bank(self):
+        # Complex conv mapping:
+        # y_real = conv([R, I], [K_real, -K_imag])
+        # y_imag = conv([R, I], [K_imag,  K_real])
+        w_real = torch.cat((self.kernel_real, -self.kernel_imag), dim=1)
+        w_imag = torch.cat((self.kernel_imag, self.kernel_real), dim=1)
+        return torch.cat((w_real, w_imag), dim=0)
+
+    def _build_bias_bank(self):
+        if not self.bias:
+            return None
+        b_real = self.bias_real - self.bias_imag
+        b_imag = self.bias_real + self.bias_imag
+        return torch.cat((b_real, b_imag), dim=0)
+
+    def _complex_conv(self, x):
+        inputR = self.cause_padding(x.real)
+        inputI = self.cause_padding(x.imag)
+        input_cat = torch.cat((inputR, inputI), dim=1)
+
+        kernel_bank = self._build_kernel_bank()
+        bias_bank = self._build_bias_bank()
+        y_cat = F.conv2d(input_cat, kernel_bank, bias=bias_bank, stride=(1, 1), padding=0)
+        y_real, y_imag = torch.chunk(y_cat, chunks=2, dim=1)
+        return torch.complex(y_real, y_imag)
+
+    def forward(self, x):
+        x_filtered = self._complex_conv(x)
+        if self.residual_mode:
+            x_residual = self.cmplx_relu(x_filtered)
+            return x + self.residual_scale * x_residual
         return self.cmplx_relu(x_filtered)
 
 
@@ -224,25 +341,192 @@ class LMF_Chain(nn.Module):
         super(LMF_Chain, self).__init__()
         self.lmf_coef = filter_coef_loader(os.path.join(configs.dataset_path, configs.coef_path),
                                           configs.lmf_coefs)
+        self.lmf_impl = str(getattr(configs, 'lmf_impl', 'v6')).lower()
         self.in_ch = 1
         # self.mf_coef = torch.tensor(self.mf_coef.copy()).to()
         self.Chain = nn.Sequential()
         for l in range(configs.lmf_layers):
             residual_mode = l > 0
-            module_name = 'lmfV6-res-{0}'.format(l) if residual_mode else 'lmfV6-prior-{0}'.format(l)
+            if self.lmf_impl == 'v7':
+                module_name = 'lmfV7-res-{0}'.format(l) if residual_mode else 'lmfV7-prior-{0}'.format(l)
+                module_cls = Learnable_Match_FilterV7
+            elif self.lmf_impl == 'v6':
+                module_name = 'lmfV6-res-{0}'.format(l) if residual_mode else 'lmfV6-prior-{0}'.format(l)
+                module_cls = Leanable_Match_FilterV6
+            else:
+                raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v6" or "v7".')
+
             self.Chain.add_module(module_name,
-                                  Leanable_Match_FilterV6(k_size=self.lmf_coef.shape[1],
-                                                          in_ch=self.in_ch,
-                                                          out_ch=configs.lmf_channels,
-                                                          lmf_coef=self.lmf_coef,
-                                                          activation=configs.activation,
-                                                          bias=configs.bias,
-                                                          residual_mode=residual_mode))
+                                  module_cls(k_size=self.lmf_coef.shape[1],
+                                             in_ch=self.in_ch,
+                                             out_ch=configs.lmf_channels,
+                                             lmf_coef=self.lmf_coef,
+                                             activation=configs.activation,
+                                             bias=configs.bias,
+                                             residual_mode=residual_mode))
             self.in_ch = configs.lmf_channels
 
     def forward(self, x):
         x = self.Chain(x)
         return x
+
+
+class LMF_Layer_Parallel(nn.Module):
+    """Parallel layer for all LMF chains at the same depth.
+
+    Input/Output layout:
+    - input:  [B, chains, C_in, P, R]
+    - output: [B, chains, C_out, P, R]
+
+    Notes:
+    - This layer is chain-parallel and compatible with both `lmf_impl=v6` and
+      `lmf_impl=v7` at the architecture level.
+    - For runtime efficiency, both paths share the packed-conv execution style
+      that is mathematically equivalent to the 4-conv complex form.
+    """
+
+    def __init__(self, k_size, in_ch, out_ch, lmf_coef, num_chains, activation='relu', bias=True, residual_mode=False, lmf_impl='v7'):
+        super(LMF_Layer_Parallel, self).__init__()
+        self.k_size = k_size
+        self.in_ch = in_ch
+        self.out_ch = out_ch
+        self.num_chains = num_chains
+        self.mf = lmf_coef.view(1, 1, 1, self.k_size)
+        self.activation = activation
+        self.bias = bias
+        self.residual_mode = residual_mode
+        self.residual_scale = 1.0
+        self.lmf_impl = str(lmf_impl).lower()
+
+        if self.lmf_impl not in ('v6', 'v7'):
+            raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v6" or "v7".')
+
+        if self.residual_mode and self.in_ch != self.out_ch:
+            raise ValueError('Residual LMF layers require in_ch == out_ch.')
+
+        kernel_real, kernel_imag = self._init_kernels()
+        self.kernel_real = nn.Parameter(kernel_real)
+        self.kernel_imag = nn.Parameter(kernel_imag)
+
+        if not self.residual_mode:
+            self.register_buffer('prior_kernel_real', kernel_real.detach().clone())
+            self.register_buffer('prior_kernel_imag', kernel_imag.detach().clone())
+        else:
+            self.prior_kernel_real = None
+            self.prior_kernel_imag = None
+
+        if self.bias:
+            self.bias_real = nn.Parameter(torch.zeros(self.num_chains, self.out_ch, dtype=torch.float32))
+            self.bias_imag = nn.Parameter(torch.zeros(self.num_chains, self.out_ch, dtype=torch.float32))
+        else:
+            self.register_parameter('bias_real', None)
+            self.register_parameter('bias_imag', None)
+
+        self.cause_padding = torch.nn.ZeroPad2d(padding=(0, self.k_size - 1, 0, 0))
+        self.cmplx_relu = ComplexReLU(self.activation)
+
+    def _init_kernels(self):
+        shape = (self.num_chains, self.out_ch, self.in_ch, 1, self.k_size)
+        if self.residual_mode:
+            real_kernel = torch.zeros(shape, dtype=torch.float32)
+            imag_kernel = torch.zeros(shape, dtype=torch.float32)
+        else:
+            base_real = self.mf.real.broadcast_to(self.out_ch, self.in_ch, 1, self.k_size)
+            base_imag = self.mf.imag.broadcast_to(self.out_ch, self.in_ch, 1, self.k_size)
+            real_kernel = base_real.unsqueeze(0).broadcast_to(shape).clone().contiguous()
+            imag_kernel = base_imag.unsqueeze(0).broadcast_to(shape).clone().contiguous()
+        return real_kernel, imag_kernel
+
+    def _build_kernel_bank(self):
+        # Complex conv mapping for each chain group:
+        # y_real = conv([R, I], [K_real, -K_imag])
+        # y_imag = conv([R, I], [K_imag,  K_real])
+        w_real = torch.cat((self.kernel_real, -self.kernel_imag), dim=2)
+        w_imag = torch.cat((self.kernel_imag, self.kernel_real), dim=2)
+        w = torch.cat((w_real, w_imag), dim=1)
+        return w.reshape(self.num_chains * 2 * self.out_ch, 2 * self.in_ch, 1, self.k_size).contiguous()
+
+    def _build_bias_bank(self):
+        if not self.bias:
+            return None
+        b_real = self.bias_real - self.bias_imag
+        b_imag = self.bias_real + self.bias_imag
+        return torch.cat((b_real, b_imag), dim=1).reshape(self.num_chains * 2 * self.out_ch).contiguous()
+
+    def _complex_conv(self, x):
+        B, chains, C_in, P, R = x.shape
+        if chains != self.num_chains or C_in != self.in_ch:
+            raise ValueError(f'Unexpected input shape for parallel LMF layer: {tuple(x.shape)}')
+
+        xr = self.cause_padding(x.real.reshape(B * chains, C_in, P, R))
+        xi = self.cause_padding(x.imag.reshape(B * chains, C_in, P, R))
+        xr = xr.reshape(B, chains, C_in, P, xr.shape[-1])
+        xi = xi.reshape(B, chains, C_in, P, xi.shape[-1])
+
+        x_cat = torch.cat((xr, xi), dim=2).reshape(B, chains * 2 * C_in, P, xr.shape[-1]).contiguous()
+        y_cat = F.conv2d(
+            x_cat,
+            self._build_kernel_bank(),
+            bias=self._build_bias_bank(),
+            stride=(1, 1),
+            padding=0,
+            groups=self.num_chains,
+        )
+        y_cat = y_cat.reshape(B, chains, 2 * self.out_ch, P, R)
+        y_real, y_imag = torch.chunk(y_cat, chunks=2, dim=2)
+        return torch.complex(y_real, y_imag)
+
+    def forward(self, x):
+        x_filtered = self._complex_conv(x)
+        if self.residual_mode:
+            x_residual = self.cmplx_relu(x_filtered)
+            return x + self.residual_scale * x_residual
+        return self.cmplx_relu(x_filtered)
+
+
+class LMF_Chain_Parallel(nn.Module):
+    """Chain-parallel LMF pipeline.
+
+    Computes all chains together at each depth, then outputs concatenated channels
+    with shape [B, chains * lmf_channels, P, R].
+    """
+
+    def __init__(self, configs):
+        super(LMF_Chain_Parallel, self).__init__()
+        self.lmf_coef = filter_coef_loader(os.path.join(configs.dataset_path, configs.coef_path),
+                                           configs.lmf_coefs)
+        self.lmf_impl = str(getattr(configs, 'lmf_impl', 'v7')).lower()
+        self.num_chains = int(configs.lmf_chains)
+        self.out_ch = int(configs.lmf_channels)
+        self.layers = nn.ModuleList()
+
+        in_ch = 1
+        for l in range(configs.lmf_layers):
+            residual_mode = l > 0
+            if self.lmf_impl not in ('v6', 'v7'):
+                raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v6" or "v7".')
+            self.layers.append(
+                LMF_Layer_Parallel(
+                    k_size=self.lmf_coef.shape[1],
+                    in_ch=in_ch,
+                    out_ch=self.out_ch,
+                    lmf_coef=self.lmf_coef,
+                    num_chains=self.num_chains,
+                    activation=configs.activation,
+                    bias=configs.bias,
+                    residual_mode=residual_mode,
+                    lmf_impl=self.lmf_impl,
+                )
+            )
+            in_ch = self.out_ch
+
+    def forward(self, x):
+        # Broadcast one shared input to all chain slots.
+        x = x.unsqueeze(1).expand(-1, self.num_chains, -1, -1, -1)
+        for layer in self.layers:
+            x = layer(x)
+        B, chains, C, P, R = x.shape
+        return x.reshape(B, chains * C, P, R)
 
 
 class Multi_Order_LDC(nn.Module):
@@ -324,6 +608,96 @@ class Multi_Order_LDC(nn.Module):
         y_i = y_i.view(B, self.orders*self.out_ch, P, R)
         y = torch.complex(y_r, y_i)
         # y = self.batch_norm(y)
+        y = self.cmplx_relu(y)
+        return y
+
+
+class MLDC_Parallel(nn.Module):
+    """Parallel draft for MLDC.
+
+    This module preserves Multi_Order_LDC semantics but reduces kernel launch count
+    by packing all order-specific filters into one shared-height conv kernel bank,
+    then running only two conv2d calls (real/imag).
+    """
+
+    def __init__(self, in_ch, out_ch, orders, activation='relu', bias=True):
+        super(MLDC_Parallel, self).__init__()
+        self.in_ch = in_ch
+        self.out_ch = out_ch
+        self.orders = orders
+        self.activation = activation
+        self.bias = bias
+
+        self.hp_coefs = self.get_highpass_coefs()
+        self.hp_kernels = self.init_highpass_kernels()
+        if self.bias:
+            self.hp_biases = nn.ParameterList([
+                nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+                for _ in range(self.orders)
+            ])
+        else:
+            self.hp_biases = None
+        self.cmplx_relu = ComplexReLU(self.activation)
+
+        # Order n uses kernel height (n+2), max kernel height is orders+1.
+        self.max_kh = self.orders + 1
+
+    def get_highpass_coefs(self):
+        import math
+        hp_coefs = []
+        for j in range(self.orders):
+            n = j + 1
+            hp_coefs_n = torch.zeros(n+1, 1)
+            for i in range(n+1):
+                if i == 0:
+                    hp_coefs_n[i] = 1
+                else:
+                    hp_coefs_n[i] = (-1)**(i) * math.factorial(n) // (math.factorial(i) * math.factorial(n-i))
+            hp_coefs.append(hp_coefs_n)
+        return hp_coefs
+
+    def init_highpass_kernels(self):
+        hp_kernels = nn.ParameterList()
+        for n in range(len(self.hp_coefs)):
+            hp_kernels_n = self.hp_coefs[n].unsqueeze(dim=0).unsqueeze(dim=0).broadcast_to(
+                self.out_ch,
+                self.in_ch,
+                n+2,
+                1,
+            )
+            hp_kernels.append(nn.Parameter(hp_kernels_n.clone().contiguous()))
+        return hp_kernels
+
+    def _build_parallel_weight_bank(self):
+        # Build [orders*out_ch, in_ch, max_kh, 1] by top-padding each order kernel.
+        banks = []
+        for n in range(self.orders):
+            # Original kernel height for order n is n+2.
+            kh_n = n + 2
+            top_pad = self.max_kh - kh_n
+            # Pad on pulse(height) dimension: (w_l, w_r, h_top, h_bottom).
+            w_padded = F.pad(self.hp_kernels[n], (0, 0, top_pad, 0))
+            banks.append(w_padded)
+        return torch.cat(banks, dim=0)
+
+    def _build_parallel_bias(self):
+        if not self.bias:
+            return None
+        return torch.cat([self.hp_biases[n] for n in range(self.orders)], dim=0)
+
+    def forward(self, x):
+        # Input: [B, C_in, P, R], output: [B, orders*out_ch, P, R]
+        # One-time top padding for all orders.
+        x_real = F.pad(x.real, (0, 0, self.orders, 0))
+        x_imag = F.pad(x.imag, (0, 0, self.orders, 0))
+
+        weight_bank = self._build_parallel_weight_bank()
+        bias_bank = self._build_parallel_bias()
+
+        y_r = F.conv2d(x_real, weight_bank, bias=bias_bank, stride=(1, 1), padding=0)
+        y_i = F.conv2d(x_imag, weight_bank, bias=bias_bank, stride=(1, 1), padding=0)
+
+        y = torch.complex(y_r, y_i)
         y = self.cmplx_relu(y)
         return y
               
@@ -491,20 +865,36 @@ class EchMo(nn.Module):
         self.lmf_channels = configs.lmf_channels
         self.lmf_layers = configs.lmf_layers
         self.lmf_coefs = configs.lmf_coefs
+        self.lmf_impl = str(getattr(configs, 'lmf_impl', 'v6')).lower()
+        self.lmf_chain_impl = str(getattr(configs, 'lmf_chain_impl', 'serial')).lower()
         # mldc cfg
         self.ldc_orders = configs.ldc_orders
         self.ldc_channels = configs.ldc_channels
+        self.mldc_impl = str(getattr(configs, 'mldc_impl', 'serial')).lower()
         # gdf cfg
         self.df_groups = configs.ldc_orders
         self.df_channels = configs.df_channels
         
-        self.LMFChain = nn.ModuleList([LMF_Chain(configs=self.cfg)
-                                       for _ in range(self.lmf_chains)])
-        self.MLDC = Multi_Order_LDC(in_ch=self.lmf_channels*self.lmf_chains,
-                                    out_ch=self.ldc_channels,
-                                    orders=self.ldc_orders,
-                                    activation=self.activation,
-                                    bias=self.bias)
+        if self.lmf_chain_impl == 'parallel':
+            self.LMFChainParallel = LMF_Chain_Parallel(configs=self.cfg)
+            self.LMFChain = None
+        elif self.lmf_chain_impl == 'serial':
+            self.LMFChain = nn.ModuleList([LMF_Chain(configs=self.cfg)
+                                           for _ in range(self.lmf_chains)])
+            self.LMFChainParallel = None
+        else:
+            raise ValueError(f'Unsupported lmf_chain_impl: {self.lmf_chain_impl}. Use "serial" or "parallel".')
+        mldc_cls = Multi_Order_LDC
+        if self.mldc_impl == 'parallel':
+            mldc_cls = MLDC_Parallel
+        elif self.mldc_impl != 'serial':
+            raise ValueError(f'Unsupported mldc_impl: {self.mldc_impl}. Use "serial" or "parallel".')
+
+        self.MLDC = mldc_cls(in_ch=self.lmf_channels*self.lmf_chains,
+                             out_ch=self.ldc_channels,
+                             orders=self.ldc_orders,
+                             activation=self.activation,
+                             bias=self.bias)
         self.GDF = Group_Purturble_DF(in_ch=self.ldc_channels,
                                       out_ch=self.df_channels,
                                       k_size=self.n_pulse,
@@ -526,12 +916,13 @@ class EchMo(nn.Module):
         elif self.scale == 'global':
             x = complex_double2float(x)
 
-        for i in range(self.lmf_chains):
-            if i == 0:
-                x_k = self.LMFChain[i](x)
-            else:
-                x_ki = self.LMFChain[i](x)
-                x_k = torch.concatenate([x_k, x_ki], dim=1)
+        if self.lmf_chain_impl == 'parallel':
+            x_k = self.LMFChainParallel(x)
+        else:
+            x_k_list = []
+            for i in range(self.lmf_chains):
+                x_k_list.append(self.LMFChain[i](x))
+            x_k = torch.cat(x_k_list, dim=1)
 
         # # MTI w/o learning
         # x_h = torch.cat((x_k[:, :, 0, :].unsqueeze(dim=2), x_k[:, :, 1:, :] - x_k[:, :, :-1, :]), dim=2)

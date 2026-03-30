@@ -65,15 +65,22 @@ class Initializer:
     def _structure_data(self):
         data = dict()
         dataloaders = self._get_dataloaders()
+        exp_desc = str(self.cfg.get('exp_desc', 'regular')).strip()
+        if not exp_desc:
+            exp_desc = 'regular'
+        # Keep folder names shell/path friendly.
+        exp_desc = exp_desc.replace(' ', '-')
+        self.cfg['exp_desc'] = exp_desc
         name_exp = (self.cfg['model'] + '_' +
                     'e' + str(self.cfg['nb_epochs']) + '_' +
                     'lr' + str(self.cfg['lr']) + '_' +
-                    self.cfg['custom_loss'])
+                    self.cfg['custom_loss'] + '_' +
+                    exp_desc)
         self.cfg['name_exp'] = name_exp
         folder_path = self.paths['logs'] / self.cfg['dataset'] / self.cfg['model'] / name_exp
-        print('>>>>>Log_Path<<<<<', self.paths['logs'])
-        print('>>>>>Data_Set<<<<<', self.cfg['dataset'])
-        print('>>>>>Model_ID<<<<<', self.cfg['model'])
+        print('>>>>>| Log_Path |<<<<<', self.paths['logs'])
+        print('>>>>>| Data_Set |<<<<<', self.cfg['dataset'])
+        print('>>>>>| Model_ID |<<<<<', self.cfg['model'])
 
         # temp_folder_name = folder_path.name + '_' + str(self.cfg['version']) + '_' + time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime())
         temp_folder_name = folder_path.name + '_' + str(self.cfg['version'])

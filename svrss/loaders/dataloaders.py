@@ -1,5 +1,6 @@
 """Classes to load datasets"""
 import os
+import warnings
 import numpy as np
 import torch
 from skimage import transform
@@ -63,6 +64,7 @@ class PeCoRSVDataset(Dataset):
         self.cmplx_flag = cmplx_flag
         self.transformations = transformations
         self.add_temp = add_temp
+        self._warned_bad_samples = set()
         # self.dataset = self.dataset[self.n_frames-1:]  # remove n first frames
         if self.dataset_type in ['CarradaRAC_RD', 'CarradaRAC_RA']:
             self.path_to_annots = self.path_to_frames / 'new_annotations' / self.annotation_type
@@ -109,6 +111,31 @@ class PeCoRSVDataset(Dataset):
         return len(self.dataset[self.n_frames-1:])
 
     def __getitem__(self, idx):
+        return self._getitem_with_retry(idx, max_retries=5)
+
+    def _getitem_with_retry(self, idx, max_retries=5):
+        last_exc = None
+        for retry in range(max_retries + 1):
+            cur_idx = (idx + retry) % len(self)
+            try:
+                return self._load_item(cur_idx)
+            except Exception as exc:
+                last_exc = exc
+                if self.dataset_type != 'LSFJamming':
+                    raise
+                bad_key = (str(self.path_to_frames), cur_idx, str(exc))
+                if bad_key not in self._warned_bad_samples:
+                    warnings.warn(
+                        f"[LSFJamming] skip corrupted sample at idx={cur_idx} in {self.path_to_frames}: {exc}",
+                        RuntimeWarning,
+                    )
+                    self._warned_bad_samples.add(bad_key)
+                continue
+        raise RuntimeError(
+            f"Failed to fetch a valid sample after {max_retries + 1} retries for {self.path_to_frames}."
+        ) from last_exc
+
+    def _load_item(self, idx):
         init_frame_name = self.dataset[idx+self.n_frames-1][0]
         if self.dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
             frame_id = int(init_frame_name)
