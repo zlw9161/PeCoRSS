@@ -80,6 +80,7 @@ def main():
     model_cfg.mldc_impl = data['cfg'].get('mldc_impl', 'serial')
     # gdf  config
     model_cfg.df_channels = data['cfg']['nb_doppler']
+    model_cfg.gdf_impl = data['cfg'].get('gdf_impl', 'conv')
     # global settings
     model_cfg.activation = data['cfg']['activation']
     model_cfg.bias = data['cfg']['bias']

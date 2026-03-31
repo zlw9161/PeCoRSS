@@ -476,21 +476,30 @@ class Model(nn.Module):
             return str(cm)
 
         n_rows, n_cols = cm.shape
-        cell_width = 11
-        header = ' ' * 6 + ''.join('{:>{w}}'.format('c{}'.format(j), w=cell_width)
-                                   for j in range(n_cols))
-        lines = [header]
+        if np.issubdtype(cm.dtype, np.integer) or np.allclose(cm, np.rint(cm), atol=1e-6):
+            formatter = lambda v: str(int(round(float(v))))
+        else:
+            formatter = lambda v: f'{float(v):.{precision}f}'
 
-        is_int = np.issubdtype(cm.dtype, np.integer)
+        str_cells = [[formatter(cm[i, j]) for j in range(n_cols)] for i in range(n_rows)]
+        col_headers = [f'c{j}' for j in range(n_cols)]
+        col_widths = []
+        for j in range(n_cols):
+            max_cell = max(len(str_cells[i][j]) for i in range(n_rows))
+            col_widths.append(max(len(col_headers[j]), max_cell))
+
+        row_label_width = max(len(f'r{n_rows - 1}'), 2)
+        sep = ' | '
+        header = ' ' * (row_label_width + len(sep)) + sep.join(
+            f'{col_headers[j]:>{col_widths[j]}}' for j in range(n_cols)
+        )
+        divider = '-' * len(header)
+
+        lines = [header, divider]
         for i in range(n_rows):
-            row_label = 'r{:<3} '.format(i)
-            row_cells = []
-            for v in cm[i]:
-                if is_int:
-                    row_cells.append('{:>{w}d}'.format(int(v), w=cell_width))
-                else:
-                    row_cells.append('{:>{w}.{p}f}'.format(float(v), w=cell_width, p=precision))
-            lines.append(row_label + ''.join(row_cells))
+            row_label = f'r{i:>{row_label_width - 1}}'
+            row = sep.join(f'{str_cells[i][j]:>{col_widths[j]}}' for j in range(n_cols))
+            lines.append(f'{row_label}{sep}{row}')
 
         return '\n'.join(lines)
 

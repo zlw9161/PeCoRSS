@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.0.7] - 2026-03-31
+
+### Added
+
+- Added configurable GDF backend switch (`gdf_impl`) in EchMo runtime path with two implementations:
+  - `conv` (original grouped-conv backend)
+  - `einsum` (tensor-contraction backend)
+- Added standalone training-stage profiling utility:
+  - `svrss/profile_echmo_train_stages.py`
+- Added comprehensive profiling result artifacts in `svrss/readme/`:
+  - train-stage summaries (`data/forward/loss/backward/optimizer/ddp_sync`)
+  - split-backward summaries (frontend vs head)
+  - frontend stagewise backward summaries (`LMF/MLDC/GDF/pack`)
+- Added standalone technical report:
+  - `svrss/readme/GDF_Conv_vs_Einsum_Backprop_Report.md`
+- Added new config for explicit einsum-path experiments:
+  - `svrss/config_files/echmo_itc_gdf_einsum.json`
+
+### Changed
+
+- Updated `svrss/config_files/echmo_itc.json` to use `gdf_impl: "einsum"` by default.
+- Extended `svrss/readme/EchMo_Backbone_Compute_Report.md` with:
+  - DDP-stage profiling results
+  - single-GPU split-backward analysis
+  - frontend stagewise backward analysis
+  - root-cause analysis and DDP validation for the GDF einsum path
+- Plumbed `gdf_impl` from config into runtime and profiling builders:
+  - `svrss/run_echmo.py`
+  - `svrss/profile_echmo_train_stages.py`
+
+### Benchmarks
+
+- DDP (`world_size=2`, batch_per_rank=8) step latency improved from `891.330 ms/iter` to `256.110 ms/iter` (`3.48x`) when switching GDF backend from `conv` to `einsum`.
+- DDP backward latency improved from `799.027 ms/iter` to `168.749 ms/iter` (`4.73x`) under the same setup.
+- Frontend stagewise profiling showed GDF backward reduced from `635.741 ms/iter` to `7.881 ms/iter` (`80.78x`) in the profiled ITC setting.
+
+### Version
+
+- Project version bumped to `1.0.7` in:
+  - `README.md`
+  - `setup.py`
+  - `CHANGELOG.md`
+
 ## [1.0.6] - 2026-03-30
 
 ### Added

@@ -712,7 +712,7 @@ class Group_Purturble_DF(nn.Module):
     the kernel in Conv: out_ch * in_ch * k_h * k_w
     then the kernel for fourier basis: doppler * in_ch * n_pulse * 1
     '''
-    def __init__(self, in_ch, out_ch, k_size, groups, activation='relu', bias=True):
+    def __init__(self, in_ch, out_ch, k_size, groups, activation='relu', bias=True, impl='conv'):
         super(Group_Purturble_DF, self).__init__()
         self.k_size = k_size
         self.in_ch = in_ch
@@ -720,6 +720,9 @@ class Group_Purturble_DF(nn.Module):
         self.groups = groups
         self.activation = activation
         self.bias = bias
+        self.impl = str(impl).lower()
+        if self.impl not in ['conv', 'einsum']:
+            raise ValueError(f'Unsupported gdf impl: {self.impl}. Use "conv" or "einsum".')
         self.stride = (k_size, 1)
         # self.doppler_padding = torch.nn.ZeroPad2d(padding=(self.k_size-n_pulse, 0, 0, 0))
         cos_kernel, sin_kernel = self.init_fourier_kernels()
@@ -755,22 +758,51 @@ class Group_Purturble_DF(nn.Module):
         return cos_kernel, sin_kernel
 
     # input: (B, C, numPulse, numRange) --> (B, C, numDoppler, numRange)
-    def forward(self, x):
+    def _forward_conv(self, x):
         # input: \tilde{X}: (B, groups*C_H, P, R)
         # output: \dot{X}: (B, groups*C_D, 1, R) --> (B, groups, C_D, R)
         B, R = x.shape[0], x.shape[3]
         x_real, x_imag = x.real.to(x.device), x.imag.to(x.device)
-        # x_real, x_imag = x.real, x.imag
         x_rr = F.conv2d(x_real, self.cos_kernel, self.cos_bias, stride=self.stride, padding=0, groups=self.groups)
         x_ii = F.conv2d(x_imag, self.sin_kernel, self.sin_bias, stride=self.stride, padding=0, groups=self.groups)
         x_ri = F.conv2d(x_real, self.sin_kernel, self.sin_bias, stride=self.stride, padding=0, groups=self.groups)
         x_ir = F.conv2d(x_imag, self.cos_kernel, self.cos_bias, stride=self.stride, padding=0, groups=self.groups)
         x = x_rr + x_ii - 1j * x_ri + 1j * x_ir
-        # x = self.batch_norm(x)
         x = self.cmplx_relu(x)
-        # folding the doppler dim into the h_size
         x = x.view(B, self.groups, self.out_ch, 1, R).squeeze(dim=3)
         return x
+
+    def _forward_einsum(self, x):
+        bsz, channels, pulse, width = x.shape
+        if channels != self.groups * self.in_ch:
+            raise ValueError(f'Unexpected GDF input channels: got {channels}, expected {self.groups * self.in_ch}.')
+        if pulse != self.k_size:
+            raise ValueError(f'Unexpected GDF pulse dimension: got {pulse}, expected {self.k_size}.')
+
+        x_real = x.real.reshape(bsz, self.groups, self.in_ch, pulse, width)
+        x_imag = x.imag.reshape(bsz, self.groups, self.in_ch, pulse, width)
+        cos_kernel = self.cos_kernel.reshape(self.groups, self.out_ch, self.in_ch, self.k_size)
+        sin_kernel = self.sin_kernel.reshape(self.groups, self.out_ch, self.in_ch, self.k_size)
+
+        real_part = torch.einsum('bgcpr,gdcp->bgdr', x_real, cos_kernel)
+        real_part = real_part + torch.einsum('bgcpr,gdcp->bgdr', x_imag, sin_kernel)
+        imag_part = torch.einsum('bgcpr,gdcp->bgdr', x_imag, cos_kernel)
+        imag_part = imag_part - torch.einsum('bgcpr,gdcp->bgdr', x_real, sin_kernel)
+
+        if self.bias:
+            cos_bias = self.cos_bias.reshape(1, self.groups, self.out_ch, 1)
+            sin_bias = self.sin_bias.reshape(1, self.groups, self.out_ch, 1)
+            real_part = real_part + cos_bias + sin_bias
+            imag_part = imag_part + cos_bias - sin_bias
+
+        x = torch.complex(real_part, imag_part)
+        x = self.cmplx_relu(x)
+        return x
+
+    def forward(self, x):
+        if self.impl == 'einsum':
+            return self._forward_einsum(x)
+        return self._forward_conv(x)
     
 
 class Leanable_Coherent_Integration(nn.Module):
@@ -872,6 +904,7 @@ class EchMo(nn.Module):
         self.ldc_orders = configs.ldc_orders
         self.ldc_channels = configs.ldc_channels
         self.mldc_impl = str(getattr(configs, 'mldc_impl', 'serial')).lower()
+        self.gdf_impl = str(getattr(configs, 'gdf_impl', 'conv')).lower()
         # gdf cfg
         self.df_groups = configs.ldc_orders
         self.df_channels = configs.df_channels
@@ -901,7 +934,8 @@ class EchMo(nn.Module):
                                       k_size=self.n_pulse,
                                       groups=self.df_groups,
                                       activation=self.activation,
-                                      bias=self.bias)
+                                      bias=self.bias,
+                                      impl=self.gdf_impl)
         # for amp+phase+I/Q                              
         self.RDTranslator = PKCIn4ANY_cuda(n_classes=self.n_classes,
                                            n_frames=self.n_frames,
@@ -911,12 +945,14 @@ class EchMo(nn.Module):
         self.RDTranslator.apply(_init_translator_weights)
 
 
-    def forward(self, x):
+    def normalize_input(self, x):
         if self.scale == 'instance':
             x = complex_double2float(complex_std(x, epsilon=1e-8))
         elif self.scale == 'global':
             x = complex_double2float(x)
+        return x
 
+    def forward_lmf(self, x):
         if self.lmf_chain_impl == 'parallel':
             x_k = self.LMFChainParallel(x)
         else:
@@ -924,6 +960,20 @@ class EchMo(nn.Module):
             for i in range(self.lmf_chains):
                 x_k_list.append(self.LMFChain[i](x))
             x_k = torch.cat(x_k_list, dim=1)
+        return x_k
+
+    def forward_mldc(self, x_k):
+        return self.MLDC(x_k)
+
+    def forward_gdf(self, x_h):
+        return self.GDF(x_h)
+
+    def pack_features(self, x_d):
+        return torch.cat((torch.abs(x_d), torch.angle(x_d), x_d.real, x_d.imag), dim=1).unsqueeze(dim=2)
+
+    def forward_frontend(self, x):
+        x = self.normalize_input(x)
+        x_k = self.forward_lmf(x)
 
         # # MTI w/o learning
         # x_h = torch.cat((x_k[:, :, 0, :].unsqueeze(dim=2), x_k[:, :, 1:, :] - x_k[:, :, :-1, :]), dim=2)
@@ -932,9 +982,9 @@ class EchMo(nn.Module):
         # x_d = torch.fft.fft(x_h, dim=2)
 
         # Learnable MTI and MTD
-        x_h = self.MLDC(x_k)
+        x_h = self.forward_mldc(x_k)
         # x_d = self.LCI(x_h)
-        x_d = self.GDF(x_h)
+        x_d = self.forward_gdf(x_h)
         
         
         # import matplotlib.pyplot as plt
@@ -956,8 +1006,14 @@ class EchMo(nn.Module):
         # x_d = torch.abs(x_d).unsqueeze(dim=2) # amp-only
         # x_d = torch.cat((x_d.real, x_d.imag), dim=1).unsqueeze(dim=2) # I/Q
         # x_d = torch.cat((torch.angle(x_d), torch.abs(x_d)), dim=1).unsqueeze(dim=2) # phase+amp (pham)
-        x_d = torch.cat((torch.abs(x_d), torch.angle(x_d), x_d.real, x_d.imag), dim=1).unsqueeze(dim=2) # amp+phase+I+Q
-        y = self.RDTranslator(x_d)
+        return self.pack_features(x_d) # amp+phase+I+Q
+
+    def forward_head(self, x_d):
+        return self.RDTranslator(x_d)
+
+    def forward(self, x):
+        x_d = self.forward_frontend(x)
+        y = self.forward_head(x_d)
         return y
 
 

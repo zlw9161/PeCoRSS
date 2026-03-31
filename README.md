@@ -4,7 +4,7 @@
 
 **Developed by PeCoLab of ISTA@CASIC**
 
-[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![Version](https://img.shields.io/badge/Version-1.0.6-brightgreen.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
+[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![Version](https://img.shields.io/badge/Version-1.0.7-brightgreen.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
 
 </div>
 
@@ -632,7 +632,7 @@ If you find PeCoRSS useful in your research, please consider citing the followin
 | Field | Info |
 |:------|:-----|
 | **Package** | `pecorss` |
-| **Version** | `1.0.6` |
+| **Version** | `1.0.7` |
 | **License** | Apache 2.0 |
 | **Repository** | [https://github.com/zlw9161](https://github.com/zlw9161) |
 | **Contact** | lwzhang9161@126.com |
@@ -659,44 +659,42 @@ For detailed release notes and version history, see [CHANGELOG.md](./CHANGELOG.m
 
 ---
 
-## 📝 Update Log (v1.0.6)
+## 📝 Update Log (v1.0.7)
 
-### LMF_V7 and Chain-Parallel Upgrade
+### GDF Execution Upgrade
 
-- Added `Learnable_Match_FilterV7` in `svrss/models/echmo_debug.py` as a latency-optimized LMF implementation.
-- Added `LMF_Layer_Parallel` and `LMF_Chain_Parallel` to support true chain-parallel LMF execution.
-- Added configurable LMF switches in runtime (`lmf_impl`, `lmf_chain_impl`) and integrated them into EchMo/EchMoWide and `run_echmo.py`.
-- Kept compatibility with the existing V6 training semantics (prior + residual mode behavior).
+- Added configurable GDF runtime switch (`gdf_impl`) with two backends in `svrss/models/echmo_debug.py`:
+  - `conv` (original grouped-conv implementation)
+  - `einsum` (tensor-contraction implementation)
+- Kept model-level functional equivalence while significantly reducing GDF backward cost in profiling runs.
+- Enabled config plumb-through for `gdf_impl` in `svrss/run_echmo.py` and `svrss/profile_echmo_train_stages.py`.
 
-### Compute Report and Equivalence Updates
+### Profiling and Benchmark Tooling
 
-- Added `MLDC` vs `MLDC_Parallel` numerical equivalence section to `svrss/readme/EchMo_Backbone_Compute_Report.md`.
-- Added `LMF_V6` vs `LMF_V7` vs `LMF_Chain_Parallel` equivalence and latency comparisons to the same report.
-- Added standalone LMF technical report: `svrss/readme/LMF_V7_Chain_Parallel_Modification_Report.md`.
+- Added `svrss/profile_echmo_train_stages.py` for reproducible stage-level training profiling.
+- Added train-iteration breakdown reports covering:
+  - data / forward / loss / backward / optimizer / DDP sync
+  - frontend-vs-head backward split
+  - frontend stagewise backward split (`LMF / MLDC / GDF / pack`)
+- Added result JSON snapshots in `svrss/readme/` for single-GPU and DDP runs.
 
-### Scale Scheme Updates (EchMo Family)
+### Technical Reports and Documentation
 
-- Completed scale-scheme rollout for EchMo family variants under `svrss/config_files/`.
-- Added/updated the following scale configs:
-  - `echmo_itc_scale.json` (base scale)
-  - `echmo_wide_itc_scale.json`
-  - `echmo_deep_itc_scale.json`
-  - `echmo_memo_itc_scale.json`
-  - `echmo_4moe_itc_scale.json`
-  - `echmo_itc_scale_lmf-v7.json`
-  - `echmo_itc_scale_lmf_chain_parallel.json`
-  - `echmo_itc_scale_lmf1.json`
-  - `echmo_ablation_lmf_layers2_scale.json`
-  - `echmo_ablation_ldc_channels4_scale.json`
-- Added corresponding architecture/compute notes in `svrss/readme/` for scale variants.
+- Extended `svrss/readme/EchMo_Backbone_Compute_Report.md` with:
+  - DDP training-stage profiling
+  - single-GPU split-backward analysis
+  - frontend stagewise backward analysis
+  - root-cause analysis and DDP validation for GDF einsum path
+- Added standalone analysis report:
+  - `svrss/readme/GDF_Conv_vs_Einsum_Backprop_Report.md`
 
-### Documentation and Repo Organization
+### Config and Runtime Updates
 
-- Moved `svrss` root-level markdown technical notes into `svrss/readme/`.
-- Standardized newly added technical notes to English for better public readability.
-- Unified class naming in parallel LMF path (`LMF_Layer_Parallel`) to keep architecture naming concise and consistent.
+- Updated `svrss/config_files/echmo_itc.json` to use `gdf_impl: "einsum"` by default for throughput-oriented runs.
+- Added comparison config:
+  - `svrss/config_files/echmo_itc_gdf_einsum.json`
 
 ### Notes
 
 - Detailed release notes are available in [CHANGELOG.md](./CHANGELOG.md).
-- Current package version is `1.0.6`.
+- Current package version is `1.0.7`.
