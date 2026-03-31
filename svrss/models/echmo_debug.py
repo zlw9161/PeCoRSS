@@ -627,6 +627,8 @@ class MLDC_Parallel(nn.Module):
         self.orders = orders
         self.activation = activation
         self.bias = bias
+        # Order n uses kernel height (n+2), max kernel height is orders+1.
+        self.max_kh = self.orders + 1
 
         self.hp_coefs = self.get_highpass_coefs()
         self.hp_kernels = self.init_highpass_kernels()
@@ -638,9 +640,6 @@ class MLDC_Parallel(nn.Module):
         else:
             self.hp_biases = None
         self.cmplx_relu = ComplexReLU(self.activation)
-
-        # Order n uses kernel height (n+2), max kernel height is orders+1.
-        self.max_kh = self.orders + 1
 
     def get_highpass_coefs(self):
         import math
@@ -665,20 +664,22 @@ class MLDC_Parallel(nn.Module):
                 n+2,
                 1,
             )
-            hp_kernels.append(nn.Parameter(hp_kernels_n.clone().contiguous()))
+            # Store each kernel directly at full height to avoid backward views
+            # with padded strides (which trigger DDP grad/bucket stride warnings).
+            full_kernel = torch.zeros(
+                self.out_ch,
+                self.in_ch,
+                self.max_kh,
+                1,
+                dtype=hp_kernels_n.dtype,
+            )
+            full_kernel[:, :, - (n + 2):, :] = hp_kernels_n
+            hp_kernels.append(nn.Parameter(full_kernel.contiguous()))
         return hp_kernels
 
     def _build_parallel_weight_bank(self):
-        # Build [orders*out_ch, in_ch, max_kh, 1] by top-padding each order kernel.
-        banks = []
-        for n in range(self.orders):
-            # Original kernel height for order n is n+2.
-            kh_n = n + 2
-            top_pad = self.max_kh - kh_n
-            # Pad on pulse(height) dimension: (w_l, w_r, h_top, h_bottom).
-            w_padded = F.pad(self.hp_kernels[n], (0, 0, top_pad, 0))
-            banks.append(w_padded)
-        return torch.cat(banks, dim=0)
+        # Kernels are already stored with full max_kh height.
+        return torch.cat([self.hp_kernels[n] for n in range(self.orders)], dim=0)
 
     def _build_parallel_bias(self):
         if not self.bias:
