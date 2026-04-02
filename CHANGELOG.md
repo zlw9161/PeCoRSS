@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.0.8] - 2026-04-02
+
+### Added
+
+- Added merged trainer implementation:
+  - `svrss/learners/model_improved.py`
+- Added trainer runtime switch in EchMo entrypoint:
+  - `trainer_impl: "legacy"` (default)
+  - `trainer_impl: "improved"`
+- Added `lmf_impl: "v5"` compatibility in EchMo LMF build paths for ablation comparisons against `v6/v7`.
+
+### Changed
+
+- Updated `svrss/run_echmo.py` to select trainer backend by config and to pass improved-trainer options (`checkpoint_path`, `use_global_dataset`) when enabled.
+- Updated `svrss/config_files/echmo_itc.json` to use improved trainer for current ITC experiments.
+- Updated `svrss/learners/model_improved.py` by removing stale commented-out code blocks to improve maintainability.
+
+### Fixed
+
+- Improved trace/export robustness by replacing trace-sensitive Python shape checks with `torch._assert` in EchMo active paths.
+- Avoided noisy startup tracing warnings by making TensorBoard graph export resilient to `TracerWarning` in `svrss/utils/tensorboard_visualizer.py`.
+
+### Version
+
+- Project version bumped to `1.0.8` in:
+  - `README.md`
+  - `setup.py`
+  - `CHANGELOG.md`
+
 ## [1.0.7] - 2026-03-31
 
 ### Added

@@ -60,7 +60,7 @@ def has_cuda_option():
     return '--with-cuda' in sys.argv
 
 setup(name='pecorss',
-    version='1.0.7',
+    version='1.0.8',
       author=['Liwen Zhang',
               'Youcheng Zhang',
               'Xinyan Zhang',

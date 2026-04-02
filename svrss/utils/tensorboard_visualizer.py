@@ -1,4 +1,7 @@
 """Class to create Tensorboard Visualization during training"""
+import warnings
+
+import torch
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -185,8 +188,12 @@ class TensorboardMultiLossVisualizer:
 
     def model_visualization(self, network, data_sample):
         try:
-            self.writer.add_graph(network, (data_sample, ))
-        except:
+            with warnings.catch_warnings():
+                warnings.filterwarnings('error', category=torch.jit.TracerWarning)
+                self.writer.add_graph(network, (data_sample, ))
+        except torch.jit.TracerWarning:
+            print('Warning: Skip model graph export due to tracing warning.')
+        except Exception:
             print("Warning: Model Visualization Failed!!!")
 
     def update_img_masks(self, pred_grid, gt_grid, iteration):

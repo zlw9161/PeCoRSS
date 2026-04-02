@@ -181,6 +181,7 @@ class Leanable_Match_FilterV6(nn.Module):
     #   - residual: if residual mode, you may want to start with a smaller learning rate for the residual kernels
     #       since they are initialized to zero and need to learn from scratch, 
     #       and then increase it as training progresses. @zlw 20260325
+    # NOTE: LMF_V6 = LMF_V5 + optional residual connection + curriculum-compatible attributes, when lmf_layers = 1, LMF_V5 == LMF_V6 (w/o residual connection).
     def __init__(self, k_size, in_ch, out_ch, lmf_coef, activation='relu', bias=True, residual_mode=False):
         super(Leanable_Match_FilterV6, self).__init__()
         self.k_size = k_size
@@ -346,24 +347,32 @@ class LMF_Chain(nn.Module):
         # self.mf_coef = torch.tensor(self.mf_coef.copy()).to()
         self.Chain = nn.Sequential()
         for l in range(configs.lmf_layers):
-            residual_mode = l > 0
+            residual_mode = (self.lmf_impl in ('v6', 'v7')) and (l > 0)
             if self.lmf_impl == 'v7':
                 module_name = 'lmfV7-res-{0}'.format(l) if residual_mode else 'lmfV7-prior-{0}'.format(l)
                 module_cls = Learnable_Match_FilterV7
             elif self.lmf_impl == 'v6':
                 module_name = 'lmfV6-res-{0}'.format(l) if residual_mode else 'lmfV6-prior-{0}'.format(l)
                 module_cls = Leanable_Match_FilterV6
+            elif self.lmf_impl == 'v5':
+                module_name = 'lmfV5-{0}'.format(l)
+                module_cls = Leanable_Match_FilterV5
             else:
-                raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v6" or "v7".')
+                raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v5", "v6" or "v7".')
+
+            module_kwargs = dict(
+                k_size=self.lmf_coef.shape[1],
+                in_ch=self.in_ch,
+                out_ch=configs.lmf_channels,
+                lmf_coef=self.lmf_coef,
+                activation=configs.activation,
+                bias=configs.bias,
+            )
+            if self.lmf_impl in ('v6', 'v7'):
+                module_kwargs['residual_mode'] = residual_mode
 
             self.Chain.add_module(module_name,
-                                  module_cls(k_size=self.lmf_coef.shape[1],
-                                             in_ch=self.in_ch,
-                                             out_ch=configs.lmf_channels,
-                                             lmf_coef=self.lmf_coef,
-                                             activation=configs.activation,
-                                             bias=configs.bias,
-                                             residual_mode=residual_mode))
+                                  module_cls(**module_kwargs))
             self.in_ch = configs.lmf_channels
 
     def forward(self, x):
@@ -380,7 +389,7 @@ class LMF_Layer_Parallel(nn.Module):
 
     Notes:
     - This layer is chain-parallel and compatible with both `lmf_impl=v6` and
-      `lmf_impl=v7` at the architecture level.
+            `lmf_impl=v7` at the architecture level.
     - For runtime efficiency, both paths share the packed-conv execution style
       that is mathematically equivalent to the 4-conv complex form.
     """
@@ -398,8 +407,8 @@ class LMF_Layer_Parallel(nn.Module):
         self.residual_scale = 1.0
         self.lmf_impl = str(lmf_impl).lower()
 
-        if self.lmf_impl not in ('v6', 'v7'):
-            raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v6" or "v7".')
+        if self.lmf_impl not in ('v5', 'v6', 'v7'):
+            raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v5", "v6" or "v7".')
 
         if self.residual_mode and self.in_ch != self.out_ch:
             raise ValueError('Residual LMF layers require in_ch == out_ch.')
@@ -455,8 +464,10 @@ class LMF_Layer_Parallel(nn.Module):
 
     def _complex_conv(self, x):
         B, chains, C_in, P, R = x.shape
-        if chains != self.num_chains or C_in != self.in_ch:
-            raise ValueError(f'Unexpected input shape for parallel LMF layer: {tuple(x.shape)}')
+        torch._assert(
+            chains == self.num_chains and C_in == self.in_ch,
+            f'Unexpected input shape for parallel LMF layer: {tuple(x.shape)}',
+        )
 
         xr = self.cause_padding(x.real.reshape(B * chains, C_in, P, R))
         xi = self.cause_padding(x.imag.reshape(B * chains, C_in, P, R))
@@ -502,9 +513,9 @@ class LMF_Chain_Parallel(nn.Module):
 
         in_ch = 1
         for l in range(configs.lmf_layers):
-            residual_mode = l > 0
-            if self.lmf_impl not in ('v6', 'v7'):
-                raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v6" or "v7".')
+            residual_mode = (self.lmf_impl in ('v6', 'v7')) and (l > 0)
+            if self.lmf_impl not in ('v5', 'v6', 'v7'):
+                raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v5", "v6" or "v7".')
             self.layers.append(
                 LMF_Layer_Parallel(
                     k_size=self.lmf_coef.shape[1],
@@ -774,10 +785,14 @@ class Group_Purturble_DF(nn.Module):
 
     def _forward_einsum(self, x):
         bsz, channels, pulse, width = x.shape
-        if channels != self.groups * self.in_ch:
-            raise ValueError(f'Unexpected GDF input channels: got {channels}, expected {self.groups * self.in_ch}.')
-        if pulse != self.k_size:
-            raise ValueError(f'Unexpected GDF pulse dimension: got {pulse}, expected {self.k_size}.')
+        torch._assert(
+            channels == self.groups * self.in_ch,
+            f'Unexpected GDF input channels: got {channels}, expected {self.groups * self.in_ch}.',
+        )
+        torch._assert(
+            pulse == self.k_size,
+            f'Unexpected GDF pulse dimension: got {pulse}, expected {self.k_size}.',
+        )
 
         x_real = x.real.reshape(bsz, self.groups, self.in_ch, pulse, width)
         x_imag = x.imag.reshape(bsz, self.groups, self.in_ch, pulse, width)

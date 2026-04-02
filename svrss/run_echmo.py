@@ -6,7 +6,8 @@ import importlib
 import json
 from svrss.utils.functions import count_params
 from svrss.learners.initializer import Initializer
-from svrss.learners.model import Model
+from svrss.learners.model import Model as LegacyModel
+from svrss.learners.model_improved import Model as ImprovedModel
 from svrss.models import EchMo, EchMo4MoE, EchMoDeep, EchMoMemo, EchMoWide, rEchMo
 import torch.nn as nn
 import torch
@@ -45,6 +46,12 @@ def main():
         cfg['nb_classes'] = 7
     else:
         raise KeyError('Dataset {} has not been supported yet.'.format(cfg['dataset']))
+
+    trainer_impl = str(cfg.get('trainer_impl', 'legacy')).lower()
+    if trainer_impl in ['improved', 'model_improved']:
+        trainer_cls = ImprovedModel
+    else:
+        trainer_cls = LegacyModel
     
 
     init = Initializer(cfg)
@@ -163,11 +170,20 @@ def main():
 
     if args.distributed:
         net = torch.nn.parallel.DistributedDataParallel(net)
-    
+
+    trainer = trainer_cls(net, data)
+    if get_rank() == 0:
+        print(f">>>>>Trainer Impl: {trainer_cls.__module__}.{trainer_cls.__name__}")
+
+    train_kwargs = {}
+    if trainer_cls is ImprovedModel:
+        train_kwargs['checkpoint_path'] = cfg.get('checkpoint_path')
+        train_kwargs['use_global_dataset'] = bool(cfg.get('use_global_dataset', False))
+
     if cfg['model'] in ['mvnet', 'fcn8s', 'unet', 'deeplabv3plus', 'kuradnet', 'kuradnet_wskip', 'pkcin4any_2d', 'ecoss', 'echmo', 'echmo_4moe', 'echmo_deep', 'echmo_memo', 'echmo_wide', 'rechmo']:
-        Model(net, data).train(add_temp=False)
+        trainer.train(add_temp=False, **train_kwargs)
     else:
-        Model(net, data).train(add_temp=True)
+        trainer.train(add_temp=True, **train_kwargs)
     
     if args.distributed:
         torch.distributed.destroy_process_group()

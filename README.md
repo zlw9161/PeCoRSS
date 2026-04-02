@@ -4,7 +4,7 @@
 
 **Developed by PeCoLab of ISTA@CASIC**
 
-[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![Version](https://img.shields.io/badge/Version-1.0.7-brightgreen.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
+[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![Version](https://img.shields.io/badge/Version-1.0.8-brightgreen.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
 
 </div>
 
@@ -632,7 +632,7 @@ If you find PeCoRSS useful in your research, please consider citing the followin
 | Field | Info |
 |:------|:-----|
 | **Package** | `pecorss` |
-| **Version** | `1.0.7` |
+| **Version** | `1.0.8` |
 | **License** | Apache 2.0 |
 | **Repository** | [https://github.com/zlw9161](https://github.com/zlw9161) |
 | **Contact** | lwzhang9161@126.com |
@@ -659,42 +659,28 @@ For detailed release notes and version history, see [CHANGELOG.md](./CHANGELOG.m
 
 ---
 
-## 📝 Update Log (v1.0.7)
+## 📝 Update Log (v1.0.8)
 
-### GDF Execution Upgrade
+### Trainer Integration and Runtime Stability
 
-- Added configurable GDF runtime switch (`gdf_impl`) with two backends in `svrss/models/echmo_debug.py`:
-  - `conv` (original grouped-conv implementation)
-  - `einsum` (tensor-contraction implementation)
-- Kept model-level functional equivalence while significantly reducing GDF backward cost in profiling runs.
-- Enabled config plumb-through for `gdf_impl` in `svrss/run_echmo.py` and `svrss/profile_echmo_train_stages.py`.
+- Added new trainer module `svrss/learners/model_improved.py` by merging stable `model.py` behavior with global-dataset and checkpoint-resume workflow.
+- Added runtime trainer switch in `svrss/run_echmo.py`:
+  - `trainer_impl: "legacy"` (default)
+  - `trainer_impl: "improved"`
+- Updated `svrss/config_files/echmo_itc.json` to use improved trainer path for ongoing experiments.
+- Reduced startup noise by making TensorBoard graph export resilient to tracing warnings in `svrss/utils/tensorboard_visualizer.py`.
 
-### Profiling and Benchmark Tooling
+### EchMo Backend Compatibility
 
-- Added `svrss/profile_echmo_train_stages.py` for reproducible stage-level training profiling.
-- Added train-iteration breakdown reports covering:
-  - data / forward / loss / backward / optimizer / DDP sync
-  - frontend-vs-head backward split
-  - frontend stagewise backward split (`LMF / MLDC / GDF / pack`)
-- Added result JSON snapshots in `svrss/readme/` for single-GPU and DDP runs.
+- Added `lmf_impl: "v5"` compatibility in EchMo LMF builder paths to support fair ablation against `v6/v7`.
+- Unified LMF module construction logic to avoid passing residual-only kwargs into `v5`.
 
-### Technical Reports and Documentation
+### Tracing and Shape-Check Robustness
 
-- Extended `svrss/readme/EchMo_Backbone_Compute_Report.md` with:
-  - DDP training-stage profiling
-  - single-GPU split-backward analysis
-  - frontend stagewise backward analysis
-  - root-cause analysis and DDP validation for GDF einsum path
-- Added standalone analysis report:
-  - `svrss/readme/GDF_Conv_vs_Einsum_Backprop_Report.md`
-
-### Config and Runtime Updates
-
-- Updated `svrss/config_files/echmo_itc.json` to use `gdf_impl: "einsum"` by default for throughput-oriented runs.
-- Added comparison config:
-  - `svrss/config_files/echmo_itc_gdf_einsum.json`
+- Replaced trace-sensitive Python shape checks with graph-friendly assertions (`torch._assert`) in the active EchMo path.
+- Kept runtime behavior unchanged while improving trace/export stability.
 
 ### Notes
 
 - Detailed release notes are available in [CHANGELOG.md](./CHANGELOG.md).
-- Current package version is `1.0.7`.
+- Current package version is `1.0.8`.
