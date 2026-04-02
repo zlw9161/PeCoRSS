@@ -18,7 +18,7 @@ In LMF_V6, layer 0 runs in prior mode, and later layers run in residual mode:
 - Layers 1..L-1 (residual): kernel initialized to zero and trained as incremental compensation only.
 
 Implementation mapping:
-- `models/echmo_debug.py`: `Leanable_Match_FilterV6`
+- `models/echmo_debug.py`: `Learnable_Match_FilterV6`
 - `models/echmo_debug.py`: `LMF_Chain` (`residual_mode=True` when `l > 0`)
 
 ### 2.2 Residual Output Gating

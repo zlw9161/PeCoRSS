@@ -136,7 +136,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Changed
 
-- EchMo LMF stack upgraded to `Leanable_Match_FilterV6`: the first layer keeps prior-guided initialization and deeper layers switch to residual correction mode.
+- EchMo LMF stack upgraded to `Learnable_Match_FilterV6`: the first layer keeps prior-guided initialization and deeper layers switch to residual correction mode.
 - EchMo RD translator path now uses amp+phase+I/Q features instead of amp-only input.
 - `echmo_scale.json` in `svrss` was retuned to the current moderate-scale EchMo baseline for NuaaSim.
 - Test and CFAR test loops now use a single-line progress bar instead of per-sequence logging spam.

@@ -29,9 +29,9 @@ def _init_translator_weights(m):
             nn.init.constant_(m.bias, 0.)
 
 
-class Leanable_Match_FilterV5(nn.Module):
+class Learnable_Match_FilterV5(nn.Module):
     def __init__(self, k_size, in_ch, out_ch, lmf_coef, activation='relu', bias=True):
-        super(Leanable_Match_FilterV5, self).__init__()
+        super(Learnable_Match_FilterV5, self).__init__()
         self.k_size = k_size
         self.stride = 1
         self.in_ch = in_ch
@@ -103,14 +103,14 @@ class LMF_Chain(nn.Module):
         self.FrozenChain = nn.Sequential()
         for l in range(configs.lmf_layers):
             self.Chain.add_module('lmfV5-{0}'.format(l),
-                                  Leanable_Match_FilterV5(k_size=self.lmf_coef.shape[1],
+                                  Learnable_Match_FilterV5(k_size=self.lmf_coef.shape[1],
                                                           in_ch=self.in_ch,
                                                           out_ch=configs.lmf_channels,
                                                           lmf_coef=self.lmf_coef,
                                                           activation=configs.activation,
                                                           bias=configs.bias))
             self.FrozenChain.add_module('lmfV5-{0}'.format(l),
-                                        Leanable_Match_FilterV5(k_size=self.lmf_coef.shape[1],
+                                        Learnable_Match_FilterV5(k_size=self.lmf_coef.shape[1],
                                                                 in_ch=self.in_ch,
                                                                 out_ch=configs.lmf_channels,
                                                                 lmf_coef=self.lmf_coef,

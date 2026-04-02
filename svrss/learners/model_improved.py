@@ -857,7 +857,7 @@ class Model(nn.Module):
         model_core = self._get_model_core()
         for module in model_core.modules():
             if module.__class__.__name__ not in (
-                'Leanable_Match_FilterV6',
+                'Learnable_Match_FilterV6',
                 'Learnable_Match_FilterV7',
                 'LMF_Layer_Parallel',
             ):

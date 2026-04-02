@@ -23,9 +23,9 @@ def _init_translator_weights(m):
             nn.init.uniform_(m.weight, 0., 1.)
             nn.init.constant_(m.bias, 0.)
 
-class Leanable_Match_FilterV2(nn.Module):
+class Learnable_Match_FilterV2(nn.Module):
     def __init__(self, k_size, in_ch, out_ch, lmf_coef, activation='relu', bias=True):
-        super(Leanable_Match_FilterV2, self).__init__()
+        super(Learnable_Match_FilterV2, self).__init__()
         self.k_size = k_size
         self.stride = 1
         self.in_ch = in_ch
@@ -99,9 +99,9 @@ class Leanable_Match_FilterV2(nn.Module):
         return lmf_res
 
 
-class Leanable_Match_FilterV5(nn.Module):
+class Learnable_Match_FilterV5(nn.Module):
     def __init__(self, k_size, in_ch, out_ch, lmf_coef, activation='relu', bias=True):
-        super(Leanable_Match_FilterV5, self).__init__()
+        super(Learnable_Match_FilterV5, self).__init__()
         self.k_size = k_size
         self.stride = 1
         self.in_ch = in_ch
@@ -162,7 +162,7 @@ class Leanable_Match_FilterV5(nn.Module):
         return x
 
 
-class Leanable_Match_FilterV6(nn.Module):
+class Learnable_Match_FilterV6(nn.Module):
     # LMF with learnable kernels, initialized w/ MF, optional bias, activation, and residual connection. 
     # Residual mode requires in_ch == out_ch.
     # Added residual_mode flag to enable/disable residual connection, and corresponding kernel initialization.
@@ -183,7 +183,7 @@ class Leanable_Match_FilterV6(nn.Module):
     #       and then increase it as training progresses. @zlw 20260325
     # NOTE: LMF_V6 = LMF_V5 + optional residual connection + curriculum-compatible attributes, when lmf_layers = 1, LMF_V5 == LMF_V6 (w/o residual connection).
     def __init__(self, k_size, in_ch, out_ch, lmf_coef, activation='relu', bias=True, residual_mode=False):
-        super(Leanable_Match_FilterV6, self).__init__()
+        super(Learnable_Match_FilterV6, self).__init__()
         self.k_size = k_size
         self.stride = 1
         self.in_ch = in_ch
@@ -353,10 +353,10 @@ class LMF_Chain(nn.Module):
                 module_cls = Learnable_Match_FilterV7
             elif self.lmf_impl == 'v6':
                 module_name = 'lmfV6-res-{0}'.format(l) if residual_mode else 'lmfV6-prior-{0}'.format(l)
-                module_cls = Leanable_Match_FilterV6
+                module_cls = Learnable_Match_FilterV6
             elif self.lmf_impl == 'v5':
                 module_name = 'lmfV5-{0}'.format(l)
-                module_cls = Leanable_Match_FilterV5
+                module_cls = Learnable_Match_FilterV5
             else:
                 raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v5", "v6" or "v7".')
 

@@ -9,9 +9,9 @@ from model_utils.echo_tools import complex_std, complex_double2float, filter_coe
 import os
 
 
-class Leanable_Match_FilterV2(nn.Module):
+class Learnable_Match_FilterV2(nn.Module):
     def __init__(self, k_size, mf_coef, activation='relu', bias=True):
-        super(Leanable_Match_FilterV2, self).__init__()
+        super(Learnable_Match_FilterV2, self).__init__()
         self.k_size = k_size
         self.stride = 1
         self.in_ch = 1
@@ -196,7 +196,7 @@ class LMF_Chain(nn.Module):
         self.Chain = nn.Sequential()
         for l in range(configs.e_layers):
             self.Chain.add_module('lmfV2-{0}'.format(l),
-                                  Leanable_Match_FilterV2(k_size=self.mf_coef.shape[1], 
+                                  Learnable_Match_FilterV2(k_size=self.mf_coef.shape[1], 
                                                           mf_coef=self.mf_coef,
                                                           activation=configs.activation,
                                                           bias=configs.bias))

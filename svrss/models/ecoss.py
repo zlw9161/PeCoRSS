@@ -23,9 +23,9 @@ def _init_translator_weights(m):
             nn.init.uniform_(m.weight, 0., 1.)
             nn.init.constant_(m.bias, 0.)
 
-class Leanable_Match_FilterV2(nn.Module):
+class Learnable_Match_FilterV2(nn.Module):
     def __init__(self, k_size, mf_coef, activation='relu', bias=True):
-        super(Leanable_Match_FilterV2, self).__init__()
+        super(Learnable_Match_FilterV2, self).__init__()
         self.k_size = k_size
         self.stride = 1
         self.in_ch = 1
@@ -172,7 +172,7 @@ class LMF_Chain(nn.Module):
         self.Chain = nn.Sequential()
         for l in range(configs.e_layers):
             self.Chain.add_module('lmfV2-{0}'.format(l),
-                                  Leanable_Match_FilterV2(k_size=self.mf_coef.shape[1],
+                                  Learnable_Match_FilterV2(k_size=self.mf_coef.shape[1],
                                                           mf_coef=self.mf_coef,
                                                           activation=configs.activation,
                                                           bias=configs.bias))

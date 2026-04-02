@@ -6,7 +6,7 @@ After `MLDC_Parallel` removed most of the MLDC bottleneck, the LMF frontend beca
 
 The original LMF path had two main issues:
 
-- The serial LMF implementation (`LMF_Chain` + `Leanable_Match_FilterV6`) uses four real-valued convolutions to emulate one complex convolution.
+- The serial LMF implementation (`LMF_Chain` + `Learnable_Match_FilterV6`) uses four real-valued convolutions to emulate one complex convolution.
 - Multiple LMF chains were designed as parallel feature heads semantically, but were executed one chain at a time in Python.
 
 The goal of this refactor was therefore:
@@ -38,7 +38,7 @@ These changes were integrated into the main EchMo path instead of remaining as i
 
 Serial LMF still uses `LMF_Chain`, but layer construction is now configurable:
 
-- `lmf_impl = "v6"` -> instantiate `Leanable_Match_FilterV6`
+- `lmf_impl = "v6"` -> instantiate `Learnable_Match_FilterV6`
 - `lmf_impl = "v7"` -> instantiate `Learnable_Match_FilterV7`
 
 This means the original chain structure is preserved while enabling an optimized layer backend.
@@ -67,7 +67,7 @@ The parallel-chain implementation uses `LMF_Layer_Parallel` as the direct execut
 
 Important design point:
 
-- `LMF_Chain` directly depends on `Leanable_Match_FilterV6` or `Learnable_Match_FilterV7`.
+- `LMF_Chain` directly depends on `Learnable_Match_FilterV6` or `Learnable_Match_FilterV7`.
 - `LMF_Chain_Parallel` directly depends on `LMF_Layer_Parallel`.
 - `LMF_Layer_Parallel` is a neutral backend name, so the codebase keeps only one V7-named class.
 

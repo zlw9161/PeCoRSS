@@ -23,9 +23,9 @@ def _init_translator_weights(m):
             nn.init.uniform_(m.weight, 0., 1.)
             nn.init.constant_(m.bias, 0.)
 
-class Leanable_Match_FilterV2(nn.Module):
+class Learnable_Match_FilterV2(nn.Module):
     def __init__(self, k_size, in_ch, out_ch, lmf_coef, activation='relu', bias=True):
-        super(Leanable_Match_FilterV2, self).__init__()
+        super(Learnable_Match_FilterV2, self).__init__()
         self.k_size = k_size
         self.stride = 1
         self.in_ch = in_ch
@@ -99,9 +99,9 @@ class Leanable_Match_FilterV2(nn.Module):
         return lmf_res
 
 
-class Leanable_Match_FilterV5(nn.Module):
+class Learnable_Match_FilterV5(nn.Module):
     def __init__(self, k_size, in_ch, out_ch, lmf_coef, activation='relu', bias=True):
-        super(Leanable_Match_FilterV5, self).__init__()
+        super(Learnable_Match_FilterV5, self).__init__()
         self.k_size = k_size
         self.stride = 1
         self.in_ch = in_ch
@@ -165,11 +165,11 @@ class Leanable_Match_FilterV5(nn.Module):
         return x
         
  
-class Leanable_Match_FilterV6(nn.Module):
+class Learnable_Match_FilterV6(nn.Module):
     # Group Conv version of LMF for dealing with multi-frame input
     # kernel size: (1, lmf_channels*groups, 1, k_size)
     def __init__(self, k_size, in_ch, out_ch, groups, lmf_coef, activation='relu', bias=True):
-        super(Leanable_Match_FilterV6, self).__init__()
+        super(Learnable_Match_FilterV6, self).__init__()
         self.k_size = k_size
         self.stride = 1
         self.in_ch = in_ch # each group handles single frame
@@ -245,7 +245,7 @@ class LMF_Chain(nn.Module):
         self.Chain = nn.Sequential()
         for l in range(configs.lmf_layers):
             self.Chain.add_module('lmfV5-{0}'.format(l),
-                                  Leanable_Match_FilterV5(k_size=self.lmf_coef.shape[1],
+                                  Learnable_Match_FilterV5(k_size=self.lmf_coef.shape[1],
                                                           in_ch=self.in_ch,
                                                           out_ch=configs.lmf_channels,
                                                           lmf_coef=self.lmf_coef,

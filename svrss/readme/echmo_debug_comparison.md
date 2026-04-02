@@ -18,8 +18,8 @@ Generated on: 2026-03-20
 ## Similarities
 - Top-level structure is the same in both files:
   - `_init_translator_weights`
-  - `Leanable_Match_FilterV2`
-  - `Leanable_Match_FilterV5`
+  - `Learnable_Match_FilterV2`
+  - `Learnable_Match_FilterV5`
   - `LMF_Chain`
   - `Multi_Order_LDC`
   - `Group_Purturble_DF`
