@@ -42,30 +42,30 @@ This branch does **not** replace convolution. It only augments it.
 
 Let the baseline LMF output be:
 
-\[
+$$
 Y_{\text{lmf}} = \text{LMF\_V6}(X)
-\]
+$$
 
 ReXAttn branch computes:
 
-\[
+$$
 Q = W_q \phi(K_{prior}), \quad K = W_k \psi(X), \quad V = W_v \psi(X)
-\]
+$$
 
-\[
+$$
 A = \sigma\left(\frac{Q K^T}{\sqrt{d}}\right), \quad R = W_o(A \odot V)
-\]
+$$
 
 Final output:
 
-\[
+$$
 Y = \text{CReLU}(Y_{\text{lmf}}) + \alpha \cdot \text{CReLU}(R)
-\]
+$$
 
-where \(\alpha = \text{rexattn\_scale}\).
+where $\alpha = \text{rexattn\_scale}$.
 
 Key properties:
-- Output shape of \(R\) is strictly aligned with \(Y_{\text{lmf}}\): `[B, out_ch, P, R]`.
+- Output shape of $R$ is strictly aligned with $Y_{\text{lmf}}$: `[B, out_ch, P, R]`.
 - No backend API change for later stages.
 
 ---
