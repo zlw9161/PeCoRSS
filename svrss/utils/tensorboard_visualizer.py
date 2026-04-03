@@ -193,8 +193,8 @@ class TensorboardMultiLossVisualizer:
                 self.writer.add_graph(network, (data_sample, ))
         except torch.jit.TracerWarning:
             print('Warning: Skip model graph export due to tracing warning.')
-        except Exception:
-            print("Warning: Model Visualization Failed!!!")
+        except Exception as exc:
+            print(f'Warning: Model Visualization Failed!!! {type(exc).__name__}: {exc}')
 
     def update_img_masks(self, pred_grid, gt_grid, iteration):
         self.writer.add_image('Predicted_masks', pred_grid, iteration)

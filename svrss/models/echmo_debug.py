@@ -245,6 +245,137 @@ class Learnable_Match_FilterV6(nn.Module):
         return self.cmplx_relu(x_filtered)
 
 
+class Learnable_Match_FilterV6_ReXAttn(nn.Module):
+    """LMF-V6 with lightweight cross-attention residual enhancement.
+
+    Main path keeps prior-initialized complex convolution from V6.
+    Residual branch uses cross-attention where:
+    - query comes from prior kernel tokens (or current kernel in residual mode)
+    - key/value come from input echo tokens
+    """
+
+    def __init__(
+        self,
+        k_size,
+        in_ch,
+        out_ch,
+        lmf_coef,
+        activation='relu',
+        bias=True,
+        residual_mode=False,
+        rexattn_dim=16,
+        rexattn_scale=0.1,
+    ):
+        super(Learnable_Match_FilterV6_ReXAttn, self).__init__()
+        self.k_size = k_size
+        self.stride = 1
+        self.in_ch = in_ch
+        self.out_ch = out_ch
+        self.mf = lmf_coef.view(1, 1, 1, self.k_size)
+        self.activation = activation
+        self.bias = bias
+        self.residual_mode = residual_mode
+        self.residual_scale = 1.0
+
+        if self.residual_mode:
+            if self.in_ch != self.out_ch:
+                raise ValueError('Residual LMF layers require in_ch == out_ch.')
+            kernel_real, kernel_imag = self.init_residual_kernels()
+        else:
+            kernel_real, kernel_imag = self.init_prior_kernels()
+
+        self.kernel_real = nn.Parameter(kernel_real)
+        self.kernel_imag = nn.Parameter(kernel_imag)
+        if not self.residual_mode:
+            self.register_buffer('prior_kernel_real', kernel_real.detach().clone())
+            self.register_buffer('prior_kernel_imag', kernel_imag.detach().clone())
+        else:
+            self.prior_kernel_real = None
+            self.prior_kernel_imag = None
+
+        if self.bias:
+            self.bias_real = nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+            self.bias_imag = nn.Parameter(torch.zeros(self.out_ch, dtype=torch.float32))
+        else:
+            self.register_parameter('bias_real', None)
+            self.register_parameter('bias_imag', None)
+
+        self.rexattn_dim = int(rexattn_dim)
+        self.rexattn_scale = float(rexattn_scale)
+        token_dim = 2 * self.in_ch
+        self.q_proj = nn.Linear(token_dim, self.rexattn_dim, bias=False)
+        self.k_proj = nn.Linear(token_dim, self.rexattn_dim, bias=False)
+        self.v_proj = nn.Linear(token_dim, self.rexattn_dim, bias=False)
+        self.o_proj = nn.Linear(self.rexattn_dim, 2, bias=False)
+
+        self.cause_padding = torch.nn.ZeroPad2d(padding=(0, self.k_size - 1, 0, 0))
+        self.cmplx_relu = ComplexReLU(self.activation)
+
+    def init_prior_kernels(self):
+        real_kernel = self.mf.real.broadcast_to(self.out_ch, self.in_ch, 1, self.k_size)
+        imag_kernel = self.mf.imag.broadcast_to(self.out_ch, self.in_ch, 1, self.k_size)
+        return real_kernel.clone().contiguous(), imag_kernel.clone().contiguous()
+
+    def init_residual_kernels(self):
+        shape = (self.out_ch, self.in_ch, 1, self.k_size)
+        real_kernel = torch.zeros(shape, dtype=torch.float32)
+        imag_kernel = torch.zeros(shape, dtype=torch.float32)
+        return real_kernel, imag_kernel
+
+    def _complex_conv(self, x):
+        inputR = self.cause_padding(x.real)
+        inputI = self.cause_padding(x.imag)
+        x_RR = F.conv2d(inputR, self.kernel_real, self.bias_real, stride=(1, 1), padding=0)
+        x_II = F.conv2d(inputI, self.kernel_imag, self.bias_imag, stride=(1, 1), padding=0)
+        x_RI = F.conv2d(inputR, self.kernel_imag, self.bias_imag, stride=(1, 1), padding=0)
+        x_IR = F.conv2d(inputI, self.kernel_real, self.bias_real, stride=(1, 1), padding=0)
+        return x_RR - x_II + 1j * (x_RI + x_IR)
+
+    def _query_tokens(self, dtype, device):
+        k_real = self.prior_kernel_real if self.prior_kernel_real is not None else self.kernel_real
+        k_imag = self.prior_kernel_imag if self.prior_kernel_imag is not None else self.kernel_imag
+        # Compress kernel taps into one query token per output channel.
+        q_real = k_real.squeeze(2).mean(dim=-1)
+        q_imag = k_imag.squeeze(2).mean(dim=-1)
+        q_tokens = torch.cat((q_real, q_imag), dim=1).contiguous().to(device=device, dtype=dtype)
+        return q_tokens
+
+    def _cross_attention_residual(self, x):
+        # x: [B, C, P, R], output: [B, out_ch, P, R]
+        bsz, channels, pulse, width = x.shape
+        torch._assert(
+            channels == self.in_ch,
+            f'Unexpected ReXAttn input channels: got {channels}, expected {self.in_ch}.',
+        )
+
+        q_tokens = self._query_tokens(dtype=x.real.dtype, device=x.device)
+        q = self.q_proj(q_tokens)  # [O, D]
+
+        kv_in = torch.cat((x.real, x.imag), dim=1).permute(0, 2, 3, 1).contiguous()  # [B, P, R, 2C]
+        k = self.k_proj(kv_in)  # [B, P, R, D]
+        v = self.v_proj(kv_in)  # [B, P, R, D]
+
+        scale = self.rexattn_dim ** -0.5
+        logits = torch.einsum('od,bprd->bopr', q, k) * scale  # [B, O, P, R]
+        attn = torch.sigmoid(logits)
+
+        ctx = attn.unsqueeze(-1) * v.unsqueeze(1)  # [B, O, P, R, D]
+        out_ri = self.o_proj(ctx)  # [B, O, P, R, 2]
+        attn_res = torch.complex(out_ri[..., 0], out_ri[..., 1])
+        return attn_res
+
+    def forward(self, x):
+        x_filtered = self._complex_conv(x)
+        x_residual = self.cmplx_relu(x_filtered)
+        if self.rexattn_scale != 0.0:
+            x_attn = self._cross_attention_residual(x)
+            x_residual = x_residual + self.rexattn_scale * self.cmplx_relu(x_attn)
+
+        if self.residual_mode:
+            return x + self.residual_scale * x_residual
+        return x_residual
+
+
 class Learnable_Match_FilterV7(nn.Module):
     """Latency-optimized independent LMF implementation.
 
@@ -347,18 +478,21 @@ class LMF_Chain(nn.Module):
         # self.mf_coef = torch.tensor(self.mf_coef.copy()).to()
         self.Chain = nn.Sequential()
         for l in range(configs.lmf_layers):
-            residual_mode = (self.lmf_impl in ('v6', 'v7')) and (l > 0)
+            residual_mode = (self.lmf_impl in ('v6', 'v6_rexattn', 'v7')) and (l > 0)
             if self.lmf_impl == 'v7':
                 module_name = 'lmfV7-res-{0}'.format(l) if residual_mode else 'lmfV7-prior-{0}'.format(l)
                 module_cls = Learnable_Match_FilterV7
             elif self.lmf_impl == 'v6':
                 module_name = 'lmfV6-res-{0}'.format(l) if residual_mode else 'lmfV6-prior-{0}'.format(l)
                 module_cls = Learnable_Match_FilterV6
+            elif self.lmf_impl == 'v6_rexattn':
+                module_name = 'lmfV6ReXAttn-res-{0}'.format(l) if residual_mode else 'lmfV6ReXAttn-prior-{0}'.format(l)
+                module_cls = Learnable_Match_FilterV6_ReXAttn
             elif self.lmf_impl == 'v5':
                 module_name = 'lmfV5-{0}'.format(l)
                 module_cls = Learnable_Match_FilterV5
             else:
-                raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v5", "v6" or "v7".')
+                raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v5", "v6", "v6_rexattn" or "v7".')
 
             module_kwargs = dict(
                 k_size=self.lmf_coef.shape[1],
@@ -368,7 +502,7 @@ class LMF_Chain(nn.Module):
                 activation=configs.activation,
                 bias=configs.bias,
             )
-            if self.lmf_impl in ('v6', 'v7'):
+            if self.lmf_impl in ('v6', 'v6_rexattn', 'v7'):
                 module_kwargs['residual_mode'] = residual_mode
 
             self.Chain.add_module(module_name,
@@ -515,7 +649,9 @@ class LMF_Chain_Parallel(nn.Module):
         for l in range(configs.lmf_layers):
             residual_mode = (self.lmf_impl in ('v6', 'v7')) and (l > 0)
             if self.lmf_impl not in ('v5', 'v6', 'v7'):
-                raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v5", "v6" or "v7".')
+                if self.lmf_impl == 'v6_rexattn':
+                    raise ValueError('lmf_impl="v6_rexattn" is only supported with lmf_chain_impl="serial".')
+                raise ValueError(f'Unsupported lmf_impl: {self.lmf_impl}. Use "v5", "v6", "v6_rexattn" or "v7".')
             self.layers.append(
                 LMF_Layer_Parallel(
                     k_size=self.lmf_coef.shape[1],

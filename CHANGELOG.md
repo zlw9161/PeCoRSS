@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.0.9] - 2026-04-03
+
+### Added
+
+- Added `Learnable_Match_FilterV6_ReXAttn` in `svrss/models/echmo_debug.py`:
+  - prior-guided LMF-V6 main path
+  - lightweight cross-attention residual enhancement branch
+- Added serial LMF backend option:
+  - `lmf_impl: "v6_rexattn"`
+- Added dedicated technical note:
+  - `svrss/readme/LMF_V6_ReXAttn_Modification_Report.md`
+- Added technical document index section in `README.md` for quick navigation to `svrss/readme/` notes.
+
+### Changed
+
+- Standardized naming in active `svrss` code and docs:
+  - `Leanable_Match_Filter*` -> `Learnable_Match_Filter*`
+- Updated curriculum module discovery to include the new ReXAttn class in:
+  - `svrss/learners/model.py`
+  - `svrss/learners/model_improved.py`
+
+### Fixed
+
+- Fixed ReXAttn residual branch shape alignment to ensure output matches the LMF-V6 main path shape (`[B, out_ch, P, R]`).
+- Improved TensorBoard graph visualization diagnostics in:
+  - `svrss/utils/tensorboard_visualizer.py`
+  by printing explicit exception type/message while keeping visualization failures non-blocking.
+
+### Version
+
+- Project version bumped to `1.0.9` in:
+  - `README.md`
+  - `setup.py`
+  - `CHANGELOG.md`
+
 ## [1.0.8] - 2026-04-02
 
 ### Added

@@ -4,7 +4,7 @@
 
 **Developed by PeCoLab of ISTA@CASIC**
 
-[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![pecorss](https://img.shields.io/badge/PeCoRSS-1.0.8-magenta.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
+[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![pecorss](https://img.shields.io/badge/PeCoRSS-1.0.9-magenta.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
 
 </div>
 
@@ -22,6 +22,7 @@
 - [Benchmark Results](#-benchmark-results)
 - [Installation](#-installation)
 - [Running Tutorial](#-running-tutorial)
+- [Technical Notes Index](#-technical-notes-index)
 - [Citation](#-citation)
 - [Acknowledgements](#-acknowledgements)
 - [Package Info](#-package-info)
@@ -559,6 +560,24 @@ python infer.py --cfg /path/to/logs/datatype/exp_name/config.json
 
 ---
 
+## 🗂 Technical Notes Index
+
+The following technical notes are maintained under `svrss/readme/`:
+
+- [EchMo Backbone Compute Report](./svrss/readme/EchMo_Backbone_Compute_Report.md)
+- [GDF Conv vs Einsum Backprop Report](./svrss/readme/GDF_Conv_vs_Einsum_Backprop_Report.md)
+- [LMF V6 vs V5 Modification Note](./svrss/readme/LMF_V6_vs_V5_Modification_Note.md)
+- [LMF V7 Chain Parallel Modification Report](./svrss/readme/LMF_V7_Chain_Parallel_Modification_Report.md)
+- [LMF V6 ReXAttn Modification Report](./svrss/readme/LMF_V6_ReXAttn_Modification_Report.md)
+- [MLDC Parallel Refactor Draft](./svrss/readme/MLDC_Parallel_Refactor_Draft.md)
+- [EchMo Debug Comparison](./svrss/readme/echmo_debug_comparison.md)
+- [EchMo4MoE Architecture](./svrss/readme/EchMo4MoE_Architecture.md)
+- [EchMoDeep Architecture](./svrss/readme/EchMoDeep_Architecture.md)
+- [EchMoMemo Architecture](./svrss/readme/EchMoMemo_Architecture.md)
+- [EchMoWide Architecture](./svrss/readme/EchMoWide_Architecture.md)
+
+---
+
 ## 📖 Citation
 
 If you find PeCoRSS useful in your research, please consider citing the following papers:
@@ -632,7 +651,7 @@ If you find PeCoRSS useful in your research, please consider citing the followin
 | Field | Info |
 |:------|:-----|
 | **Package** | `pecorss` |
-| **Version** | `1.0.8` |
+| **Version** | `1.0.9` |
 | **License** | Apache 2.0 |
 | **Repository** | [https://github.com/zlw9161](https://github.com/zlw9161) |
 | **Contact** | lwzhang9161@126.com |
@@ -659,28 +678,26 @@ For detailed release notes and version history, see [CHANGELOG.md](./CHANGELOG.m
 
 ---
 
-## 📝 Update Log (v1.0.8)
+## 📝 Update Log (v1.0.9)
 
-### Trainer Integration and Runtime Stability
+### LMF ReXAttn and Naming Cleanup
 
-- Added new trainer module `svrss/learners/model_improved.py` by merging stable `model.py` behavior with global-dataset and checkpoint-resume workflow.
-- Added runtime trainer switch in `svrss/run_echmo.py`:
-  - `trainer_impl: "legacy"` (default)
-  - `trainer_impl: "improved"`
-- Updated `svrss/config_files/echmo_itc.json` to use improved trainer path for ongoing experiments.
-- Reduced startup noise by making TensorBoard graph export resilient to tracing warnings in `svrss/utils/tensorboard_visualizer.py`.
+- Added plug-in `Learnable_Match_FilterV6_ReXAttn` in `svrss/models/echmo_debug.py`.
+- Added `lmf_impl: "v6_rexattn"` in serial LMF path for ablation and enhancement experiments.
+- Added dedicated technical note: `svrss/readme/LMF_V6_ReXAttn_Modification_Report.md`.
+- Standardized class spelling from `Leanable_*` to `Learnable_*` across active `svrss` code and related docs.
 
-### EchMo Backend Compatibility
+### Runtime and Trace Diagnostics
 
-- Added `lmf_impl: "v5"` compatibility in EchMo LMF builder paths to support fair ablation against `v6/v7`.
-- Unified LMF module construction logic to avoid passing residual-only kwargs into `v5`.
+- Enhanced TensorBoard graph visualization error diagnostics to print exception type and message.
+- Kept graph-export failure non-blocking for training process.
 
-### Tracing and Shape-Check Robustness
+### Documentation and Config Indexing
 
-- Replaced trace-sensitive Python shape checks with graph-friendly assertions (`torch._assert`) in the active EchMo path.
-- Kept runtime behavior unchanged while improving trace/export stability.
+- Added a technical document index section in `README.md` linking core files under `svrss/readme/`.
+- Added ReXAttn experiment config and cleaned obsolete compact config variant in this release cycle.
 
 ### Notes
 
 - Detailed release notes are available in [CHANGELOG.md](./CHANGELOG.md).
-- Current package version is `1.0.8`.
+- Current package version is `1.0.9`.
