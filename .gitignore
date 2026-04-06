@@ -11,6 +11,9 @@ dist/
 .idea/
 .vscode/
 
+# Local Copilot custom agents (do not sync)
+.github/agents/
+
 # Model checkpoints
 *.pt
 .vscode

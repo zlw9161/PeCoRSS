@@ -74,6 +74,7 @@ class Model(nn.Module):
             self.soft_trackloss = self.cfg['soft_trackloss']
         self.distributed = self.cfg['distributed']
         self.num_workers = self.cfg['num_workers']
+        self.enable_graph_vis = bool(self.cfg.get('enable_graph_vis', False))
         self.rank = get_rank()
         if self.rank == 0:
             self.writer = SummaryWriter(self.paths['writer'])
@@ -154,7 +155,7 @@ class Model(nn.Module):
         best_val_recall = 0
         best_test_dice = 0
         flag_save = False
-        model_vis_flag = True
+        model_vis_flag = self.enable_graph_vis
         optimizer = optim.Adam(self.net.parameters(), lr=self.lr)
         if self.schedular_type == 'exp':
             scheduler = ExponentialLR(optimizer, gamma=0.9)

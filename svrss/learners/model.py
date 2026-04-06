@@ -65,6 +65,7 @@ class Model(nn.Module):
         self.distributed = self.cfg['distributed']
         self.num_workers = self.cfg['num_workers']
         self.cmplx_flag = self.cfg['cmplx_flag']
+        self.enable_graph_vis = bool(self.cfg.get('enable_graph_vis', False))
         self.rank = get_rank()
         self.lmf_v6_curriculum_enable = self.cfg.get('lmf_v6_curriculum_enable', False)
         self.lmf_v6_freeze_ratio = float(self.cfg.get('lmf_v6_freeze_ratio', 0.1))
@@ -150,7 +151,7 @@ class Model(nn.Module):
         best_test_dop = 0
         best_test_ang = 0
         best_test_dop_plus_ang = 0
-        model_vis_flag = True
+        model_vis_flag = self.enable_graph_vis
 
         for epoch in range(self.nb_epochs):
             # lt @20230417

@@ -1,6 +1,7 @@
 """Class to train a PyTorch model"""
 import os
 import json
+from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
@@ -65,6 +66,7 @@ class Model(nn.Module):
         self.distributed = self.cfg['distributed']
         self.num_workers = self.cfg['num_workers']
         self.cmplx_flag = self.cfg['cmplx_flag']
+        self.enable_graph_vis = bool(self.cfg.get('enable_graph_vis', False))
         self.pin_mem = bool(self.cfg.get('pin_mem', False))
         self.reck = self.cfg.get('ReCK_MODE', 'none')
         self.use_global_dataset = bool(self.cfg.get('use_global_dataset', False))
@@ -152,7 +154,7 @@ class Model(nn.Module):
         flag_save = False
         name_result = []
         best_test_dop = 0
-        model_vis_flag = True
+        model_vis_flag = self.enable_graph_vis
 
         for epoch in range(self.nb_epochs):
             if self.schedular_type == 'exp':
@@ -451,19 +453,19 @@ class Model(nn.Module):
         else:
             raise KeyError('we only implement schedular of exp and cos')
 
-        if checkpoint_path is not None and os.path.exists(checkpoint_path):
+        if checkpoint_path:
             loaded = self._load_checkpoint(checkpoint_path)
             self.start_epoch, self.start_iteration, self.best_test_dop, opt_state, sch_state = loaded
             if opt_state is not None:
                 optimizer.load_state_dict(opt_state)
             if sch_state is not None:
                 scheduler.load_state_dict(sch_state)
-            model_vis_flag = True
+            model_vis_flag = self.enable_graph_vis
         else:
             self.start_epoch = 0
             self.start_iteration = 0
             self.best_test_dop = 0.0
-            model_vis_flag = True
+            model_vis_flag = self.enable_graph_vis
 
         iteration = self.start_iteration
         flag_save = False
@@ -793,17 +795,55 @@ class Model(nn.Module):
                 }
                 torch.save(checkpoint, ckpt_path)
 
+    def _resolve_checkpoint_path(self, checkpoint_path):
+        raw_path = str(checkpoint_path).strip()
+        if not raw_path:
+            return None, []
+
+        raw_path = os.path.expanduser(raw_path)
+        candidates = [raw_path]
+
+        if not os.path.isabs(raw_path):
+            candidates.append(os.path.abspath(raw_path))
+
+            repo_root = Path(__file__).resolve().parents[2]
+            candidates.append(str((repo_root / raw_path).resolve()))
+
+            logs_root = self.paths.get('logs')
+            if logs_root is not None:
+                logs_root = Path(logs_root)
+                candidates.append(str((logs_root.parent / raw_path).resolve()))
+                candidates.append(str((logs_root.parent.parent / raw_path).resolve()))
+
+        dedup_candidates = []
+        seen = set()
+        for cand in candidates:
+            if cand not in seen:
+                seen.add(cand)
+                dedup_candidates.append(cand)
+
+        for cand in dedup_candidates:
+            if os.path.exists(cand):
+                return cand, dedup_candidates
+
+        return None, dedup_candidates
+
     def _load_checkpoint(self, checkpoint_path):
-        if not os.path.exists(checkpoint_path):
+        resolved_checkpoint_path, searched_paths = self._resolve_checkpoint_path(checkpoint_path)
+        if resolved_checkpoint_path is None:
             if self.rank == 0:
                 print(f'Checkpoint does not exist: {checkpoint_path}, starting from scratch.')
+                if searched_paths:
+                    print('Searched paths:')
+                    for p in searched_paths:
+                        print(f'   - {p}')
             return 0, 0, 0.0, None, None
 
         if self.rank == 0:
-            print(f'Resuming training from checkpoint: {checkpoint_path}')
+            print(f'Resuming training from checkpoint: {resolved_checkpoint_path}')
 
         try:
-            checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
+            checkpoint = torch.load(resolved_checkpoint_path, map_location=self.device, weights_only=False)
         except Exception as exc:
             if self.rank == 0:
                 print(f'Failed to load checkpoint: {exc}, starting from scratch.')

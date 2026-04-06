@@ -1,5 +1,6 @@
 # Single mode
 # > CUDA_VISIBLE_DEVICES=4 python run.py --cfg config_files/pkcin4cwr.json
+CUDA_VISIBLE_DEVICES=2 python run_echmo.py --cfg config_files/echmo_itc_lmfv6-rexattn.json
 
 # DP mode
 # e.g., config files: gpu_id=[0,1], device="cuda:0"

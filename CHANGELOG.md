@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.1.0] - 2026-04-06
+
+### Added
+
+- Added graph-visualization runtime switch `enable_graph_vis` (default: `false`) in trainers:
+  - `svrss/learners/model.py`
+  - `svrss/learners/model_improved.py`
+  - `svrss/learners/model_F.py`
+- Added `enable_graph_vis: false` in:
+  - `svrss/config_files/echmo_itc_lmfv6-rexattn.json`
+
+### Changed
+
+- Updated improved trainer checkpoint resume path handling to support robust multi-root resolution for relative `checkpoint_path` values.
+- Updated checkpoint loading logs to print searched candidate paths when not found, improving resume diagnostics.
+- Updated `svrss/run_ddp.sh` with current EchMo ReXAttn launch example.
+
+### Fixed
+
+- Fixed resume-training fallback issue where valid relative `checkpoint_path` could be treated as missing depending on launch working directory.
+- Fixed inconsistent graph-export attempts by honoring the new `enable_graph_vis` flag in both normal and global-dataset training flows.
+
+### Version
+
+- Project version bumped to `1.1.0` in:
+  - `README.md`
+  - `setup.py`
+  - `CHANGELOG.md`
+
 ## [1.0.9] - 2026-04-03
 
 ### Added
