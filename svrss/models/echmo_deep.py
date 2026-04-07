@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from svrss.models.echmo_debug import EchMo
+from svrss.models.echmo import EchMo
 
 
 class _CfgView:

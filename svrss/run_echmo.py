@@ -88,6 +88,7 @@ def main():
     # gdf  config
     model_cfg.df_channels = data['cfg']['nb_doppler']
     model_cfg.gdf_impl = data['cfg'].get('gdf_impl', 'conv')
+    model_cfg.pack_feat = data['cfg'].get('pack_feat', 'apiq')
     # global settings
     model_cfg.activation = data['cfg']['activation']
     model_cfg.bias = data['cfg']['bias']

@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.1.1] - 2026-04-07
+
+### Added
+
+- Added formal EchMo implementation and family routing to the formal module path:
+  - `svrss/models/echmo.py` (new)
+  - updated family imports in `svrss/models/__init__.py`, `echmo_deep.py`, `echmo_wide.py`, `echmo_4moe.py`, `echmo_memo.py`
+- Added EchMo family documentation and experiment planning artifacts:
+  - `svrss/readme/EchMo_Family_User_Manual.md`
+  - `svrss/readme/EchMo_Family_Scale_Experiment_Template.md`
+  - `svrss/readme/EchMo_Family_Scale_Validation_Plan_R1.md`
+- Added improved-trainer performance logging into `results.json`:
+  - `runtime_metrics.avg_step_latency_ms`
+  - `runtime_metrics.peak_gpu_memory_mb`
+  - `model_profile.trainable_params`
+  - `model_profile.flops_per_sample` / `model_profile.flops_status`
+
+### Changed
+
+- Updated EchMo runtime packing configuration with explicit `pack_feat` modes (`apiq`, `ap`, `iq`, `amp`) and propagated config parsing in `svrss/run_echmo.py`.
+- Updated improved trainer to always write a final results artifact (`*_final_results.json`) at training end.
+- Updated DDP behavior for FLOPs profiling: profiling now runs on rank 0 and records availability status in results.
+
+### Fixed
+
+- Fixed formal EchMo path cleanup by removing unused debug-only structures in active model path while keeping debug file for experimentation.
+- Fixed experiment record friction by embedding fillable R1 run tables into validation plan docs.
+
+### Version
+
+- Project version bumped to `1.1.1` in:
+  - `README.md`
+  - `setup.py`
+  - `CHANGELOG.md`
+
 ## [1.1.0] - 2026-04-06
 
 ### Added

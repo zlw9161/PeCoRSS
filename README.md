@@ -4,7 +4,7 @@
 
 **Developed by PeCoLab of ISTA@CASIC**
 
-[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![pecorss](https://img.shields.io/badge/PeCoRSS-1.1.0-magenta.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
+[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![pecorss](https://img.shields.io/badge/PeCoRSS-1.1.1-magenta.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
 
 </div>
 
@@ -651,7 +651,7 @@ If you find PeCoRSS useful in your research, please consider citing the followin
 | Field | Info |
 |:------|:-----|
 | **Package** | `pecorss` |
-| **Version** | `1.1.0` |
+| **Version** | `1.1.1` |
 | **License** | Apache 2.0 |
 | **Repository** | [https://github.com/zlw9161](https://github.com/zlw9161) |
 | **Contact** | lwzhang9161@126.com |
@@ -678,21 +678,25 @@ For detailed release notes and version history, see [CHANGELOG.md](./CHANGELOG.m
 
 ---
 
-## 📝 Update Log (v1.1.0)
+## 📝 Update Log (v1.1.1)
 
-### Resume and Visualization Controls
+### EchMo Family and Runtime Metrics
 
-- Added trainer switch `enable_graph_vis` with default `false` to avoid trace-based graph export in regular training runs.
-- Added `enable_graph_vis: false` in `svrss/config_files/echmo_itc_lmfv6-rexattn.json`.
-- Improved `checkpoint_path` resume handling in improved trainer to resolve relative paths across common launch roots.
-- Enhanced checkpoint diagnostics by printing searched candidate paths when checkpoint file is not found.
+- Added formal EchMo module `svrss/models/echmo.py` and switched family variants (`deep`, `wide`, `4moe`, `memo`) to import from formal path.
+- Added `pack_feat` runtime options (`apiq`, `ap`, `iq`, `amp`) for EchMo feature packing experiments.
+- Added improved-trainer runtime metrics logging into results artifacts:
+  - step latency (`runtime_metrics.avg_step_latency_ms`)
+  - peak GPU memory (`runtime_metrics.peak_gpu_memory_mb`)
+  - trainable parameters (`model_profile.trainable_params`)
+  - FLOPs when available (`model_profile.flops_per_sample`)
+- Added DDP-compatible FLOPs profiling behavior (rank0 profiling + status record).
 
-### Runtime and Workflow Updates
+### Experiment Documentation
 
-- Graph export is now strictly controlled by config and no longer attempted by default.
-- Updated `svrss/run_ddp.sh` with the current EchMo ReXAttn launch example.
+- Added EchMo family user manual and scale experiment template.
+- Added R1 validation plan with fillable run record tables for direct in-plan tracking.
 
 ### Notes
 
 - Detailed release notes are available in [CHANGELOG.md](./CHANGELOG.md).
-- Current package version is `1.1.0`.
+- Current package version is `1.1.1`.

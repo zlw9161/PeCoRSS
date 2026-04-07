@@ -1,6 +1,7 @@
 """Class to train a PyTorch model"""
 import os
 import json
+import importlib
 from pathlib import Path
 import numpy as np
 import torch
@@ -12,7 +13,7 @@ from torch.utils.data import DataLoader, ConcatDataset
 
 from svrss.loaders.dataloaders import PeCoRSVDataset
 from svrss.learners.tester import Tester
-from svrss.utils.functions import normalize, define_loss, get_transformations
+from svrss.utils.functions import normalize, define_loss, get_transformations, count_params
 from svrss.utils.tensorboard_visualizer import TensorboardMultiLossVisualizer
 from svrss.utils.distributed_utils import get_rank, reduce_value
 import random
@@ -95,6 +96,11 @@ class Model(nn.Module):
         else:
             self.tester = Tester(self.cfg)
         self.results = dict()
+        self._runtime_step_count = 0
+        self._runtime_step_time_sum_ms = 0.0
+        self._runtime_last_step_latency_ms = None
+        self._runtime_peak_gpu_memory_mb = None
+        self._runtime_model_profile = {}
         self.start_epoch = 0
         self.start_iteration = 0
         self.best_test_dop = 0.0
@@ -118,6 +124,9 @@ class Model(nn.Module):
                 checkpoint_path=checkpoint_path,
                 use_global_dataset=use_global_dataset,
             )
+
+        if self.rank == 0:
+            self._init_runtime_metrics(add_temp)
 
         if self.rank == 0:
             self.writer.add_text('Comments', self.comments)
@@ -206,6 +215,7 @@ class Model(nn.Module):
                                               batch_sampler=train_batch_sampler,
                                               num_workers=self.num_workers)
                 for _, frame in enumerate(frame_dataloader):
+                    step_start = time.perf_counter() if self.rank == 0 else None
                     if self.cmplx_flag:
                         rd_data = frame['rd_matrix'].to(self.device)
                     else:
@@ -239,6 +249,7 @@ class Model(nn.Module):
                     loss.backward()
                     optimizer.step()
                     if self.rank == 0:
+                        self._update_step_latency(step_start)
                         running_losses.append(loss_reduced.data.cpu().numpy()[()])
                         rd_running_losses.append(rd_loss_reduced.data.cpu().numpy()[()])
                         rd_running_global_losses[0].append(rd_losses_reduced[0].data.cpu().numpy()[()])
@@ -404,6 +415,7 @@ class Model(nn.Module):
                             self.results['train_loss'] = train_loss.item()
                             self.results['val_metrics'] = val_metrics
                             self.results['test_metrics'] = test_metrics
+                            self._attach_runtime_metrics_to_results()
                     
                             
                             if test_metrics[signal_type]['dice'] > best_test_dop and iteration > 0:
@@ -418,11 +430,14 @@ class Model(nn.Module):
                         self.net.train()  # Train mode after evaluation process
                     iteration += 1
         if self.rank == 0:
+            self._attach_runtime_metrics_to_results()
+            self._save_results([f'{self.model_name}_final'])
             self.writer.close()
 
     def _train_with_global_dataset(self, add_temp=False, checkpoint_path=None, use_global_dataset=True):
         if self.rank == 0:
             self.writer.add_text('Comments', self.comments)
+            self._init_runtime_metrics(add_temp)
 
         train_loader, val_loader, test_loader = self.dataloaders
         transformations = get_transformations(self.transform_names, sizes=(self.w_size, self.h_size))
@@ -493,6 +508,7 @@ class Model(nn.Module):
 
             for frame_loader in frame_loaders:
                 for _, frame in enumerate(frame_loader):
+                    step_start = time.perf_counter() if self.rank == 0 else None
                     if self.cmplx_flag:
                         rd_data = frame['rd_matrix'].to(self.device)
                     else:
@@ -525,6 +541,7 @@ class Model(nn.Module):
                     optimizer.step()
 
                     if self.rank == 0:
+                        self._update_step_latency(step_start)
                         running_losses.append(loss_reduced.data.cpu().numpy()[()])
                         rd_running_losses.append(rd_loss_reduced.data.cpu().numpy()[()])
                         rd_running_global_losses[0].append(rd_losses_reduced[0].data.cpu().numpy()[()])
@@ -578,6 +595,7 @@ class Model(nn.Module):
                             self.results['train_loss'] = float(train_loss) if 'train_loss' in locals() else None
                             self.results['val_metrics'] = val_metrics
                             self.results['test_metrics'] = test_metrics
+                            self._attach_runtime_metrics_to_results()
 
                             if test_metrics[signal_type]['dice'] > self.best_test_dop:
                                 self.best_test_dop = test_metrics[signal_type]['dice']
@@ -615,6 +633,8 @@ class Model(nn.Module):
                 )
 
         if self.rank == 0:
+            self._attach_runtime_metrics_to_results()
+            self._save_results([f'{self.model_name}_final'])
             self.writer.close()
             if self.reck == 'ReCK-1' and hasattr(self.net, 'remove_hooks'):
                 self.net.remove_hooks()
@@ -752,6 +772,119 @@ class Model(nn.Module):
             lines.append(f'{row_label}{sep}{row}')
 
         return '\n'.join(lines)
+
+    def _init_runtime_metrics(self, add_temp):
+        self._runtime_step_count = 0
+        self._runtime_step_time_sum_ms = 0.0
+        self._runtime_last_step_latency_ms = None
+        self._runtime_peak_gpu_memory_mb = None
+
+        self._runtime_model_profile = {
+            'trainable_params': int(count_params(self._get_model_core())),
+            'flops_per_sample': None,
+            'flops_status': 'unavailable',
+            'flops_error': None,
+        }
+
+        flops, status, err = self._profile_flops_per_sample(add_temp)
+        self._runtime_model_profile['flops_per_sample'] = flops
+        self._runtime_model_profile['flops_status'] = status
+        self._runtime_model_profile['flops_error'] = err
+
+        if self._is_cuda_device():
+            try:
+                torch.cuda.reset_peak_memory_stats(torch.device(self.device))
+            except Exception:
+                pass
+
+    def _is_cuda_device(self):
+        try:
+            return torch.device(self.device).type == 'cuda' and torch.cuda.is_available()
+        except Exception:
+            return False
+
+    def _update_step_latency(self, step_start):
+        if step_start is None:
+            return
+        if self._is_cuda_device():
+            torch.cuda.synchronize(torch.device(self.device))
+        elapsed_ms = (time.perf_counter() - step_start) * 1000.0
+        self._runtime_step_count += 1
+        self._runtime_step_time_sum_ms += elapsed_ms
+        self._runtime_last_step_latency_ms = elapsed_ms
+
+    def _get_peak_gpu_memory_mb(self):
+        if not self._is_cuda_device():
+            return None
+        try:
+            return float(torch.cuda.max_memory_allocated(torch.device(self.device)) / (1024 ** 2))
+        except Exception:
+            return None
+
+    def _attach_runtime_metrics_to_results(self):
+        if self._runtime_step_count > 0:
+            avg_step_latency_ms = self._runtime_step_time_sum_ms / self._runtime_step_count
+        else:
+            avg_step_latency_ms = None
+
+        peak_gpu_mem = self._get_peak_gpu_memory_mb()
+        if peak_gpu_mem is not None:
+            if self._runtime_peak_gpu_memory_mb is None:
+                self._runtime_peak_gpu_memory_mb = peak_gpu_mem
+            else:
+                self._runtime_peak_gpu_memory_mb = max(self._runtime_peak_gpu_memory_mb, peak_gpu_mem)
+
+        self.results['runtime_metrics'] = {
+            'avg_step_latency_ms': float(avg_step_latency_ms) if avg_step_latency_ms is not None else None,
+            'last_step_latency_ms': float(self._runtime_last_step_latency_ms) if self._runtime_last_step_latency_ms is not None else None,
+            'steps_timed': int(self._runtime_step_count),
+            'peak_gpu_memory_mb': float(self._runtime_peak_gpu_memory_mb) if self._runtime_peak_gpu_memory_mb is not None else None,
+        }
+        self.results['model_profile'] = self._runtime_model_profile
+
+        if self.rank == 0:
+            rt = self.results['runtime_metrics']
+            print('[Perf] avg_step_latency_ms={}, peak_gpu_memory_mb={}, params={}, flops_status={}, flops_per_sample={}'.format(
+                rt['avg_step_latency_ms'],
+                rt['peak_gpu_memory_mb'],
+                self._runtime_model_profile.get('trainable_params'),
+                self._runtime_model_profile.get('flops_status'),
+                self._runtime_model_profile.get('flops_per_sample'),
+            ))
+
+    def _profile_flops_per_sample(self, add_temp):
+        if self.distributed and self.rank != 0:
+            return None, 'unavailable', 'ddp non-master rank skips profiling'
+
+        try:
+            thop_profile = importlib.import_module('thop').profile
+        except Exception:
+            return None, 'unavailable', 'thop not installed'
+
+        model_core = self._get_model_core()
+        was_training = model_core.training
+        model_core.eval()
+
+        try:
+            if add_temp:
+                dummy_input = torch.randn(1, 1, self.n_frames, self.w_size, self.h_size)
+            else:
+                dummy_input = torch.randn(1, 1, self.w_size, self.h_size)
+
+            if self._is_cuda_device():
+                dev = torch.device(self.device)
+                model_core = model_core.to(dev)
+                dummy_input = dummy_input.to(dev)
+
+            with torch.no_grad():
+                flops, _ = thop_profile(model_core, inputs=(torch.complex(dummy_input, dummy_input),), verbose=False)
+            status = 'ok_ddp_rank0' if self.distributed else 'ok'
+            return float(flops), status, None
+        except Exception as exc:
+            return None, 'error', str(exc)
+        finally:
+            if was_training:
+                model_core.train()
 
     def _save_results(self, names, save_full_checkpoint=False, current_epoch=None,
                       optimizer=None, scheduler=None, current_iteration=None, best_dice=None):

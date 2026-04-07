@@ -26,7 +26,7 @@ from .pkcin4any_2d import PKCIn4ANY_2D
 from .pkcin4any_cuda import PKCIn4ANY_cuda
 # for end-to-end
 from .ecoss import ECoSS
-from .echmo_debug import EchMo
+from .echmo import EchMo
 from .echmo_4moe import EchMo4MoE
 from .echmo_deep import EchMoDeep
 from .echmo_memo import EchMoMemo

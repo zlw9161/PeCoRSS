@@ -23,6 +23,7 @@
  "mldc_impl": "serial",
  "nb_doppler": 128,
  "gdf_impl": "einsum",
+ "pack_feat": "apiq",
  "activation": "leaky_relu",
  "bias": true,
  "nb_epochs": 300,

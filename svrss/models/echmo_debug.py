@@ -956,7 +956,7 @@ class Group_Purturble_DF(nn.Module):
         return self._forward_conv(x)
     
 
-class Leanable_Coherent_Integration(nn.Module):
+class Learnable_Coherent_Integration(nn.Module):
     # learnable MTD or FFT
     '''
     X(f) = \sum_{t=0}^{T-1} x(t)(cos(2*\pi*f*t/T) - j*sin(2*\pi*f*t/T))
@@ -966,7 +966,7 @@ class Leanable_Coherent_Integration(nn.Module):
     then the kernel for fourier basis: doppler * in_ch * n_pulse * 1
     '''
     def __init__(self, in_ch, out_ch, k_size, activation='relu', bias=True):
-        super(Leanable_Coherent_Integration, self).__init__()
+        super(Learnable_Coherent_Integration, self).__init__()
         self.k_size = k_size
         self.stride = (k_size, 1)
         self.in_ch = in_ch
@@ -1029,6 +1029,9 @@ class Leanable_Coherent_Integration(nn.Module):
         # folding the doppler dim into the h_size
         lci_res = lci_res.permute(0, 2, 1, 3)
         return lci_res
+
+
+Leanable_Coherent_Integration = Learnable_Coherent_Integration
 
 
 class EchMo(nn.Module):

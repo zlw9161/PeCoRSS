@@ -3,7 +3,7 @@
 import torch
 import torch.nn as nn
 
-from svrss.models.echmo_debug import EchMo
+from svrss.models.echmo import EchMo
 
 
 class _CfgView:
