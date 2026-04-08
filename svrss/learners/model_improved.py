@@ -885,6 +885,22 @@ class Model(nn.Module):
         finally:
             if was_training:
                 model_core.train()
+            # Clean up thop buffers to avoid DDP sync issues (only rank 0 has them)
+            # fixed the issue for v1.1.1 @20260407
+            for buf_name in ['total_ops', 'total_params']:
+                if hasattr(model_core, buf_name):
+                    try:
+                        delattr(model_core, buf_name)
+                    except Exception:
+                        pass
+                # Also clean up from all submodules
+                for module in model_core.modules():
+                    if hasattr(module, buf_name):
+                        try:
+                            delattr(module, buf_name)
+                        except Exception:
+                            pass
+                
 
     def _save_results(self, names, save_full_checkpoint=False, current_epoch=None,
                       optimizer=None, scheduler=None, current_iteration=None, best_dice=None):
