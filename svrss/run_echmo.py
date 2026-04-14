@@ -8,7 +8,7 @@ from svrss.utils.functions import count_params
 from svrss.learners.initializer import Initializer
 from svrss.learners.model import Model as LegacyModel
 from svrss.learners.model_improved import Model as ImprovedModel
-from svrss.models import EchMo, EchMo4MoE, EchMoDeep, EchMoMemo, EchMoWide, rEchMo
+from svrss.models import EchMo, EchMo4MoE, EchMoDeep, EchMoMemo, EchMoReCK, EchMoWide, rEchMo
 import torch.nn as nn
 import torch
 from svrss.utils.paths import Paths
@@ -112,6 +112,13 @@ def main():
     model_cfg.moe_gate_hidden = data['cfg'].get('moe_gate_hidden', 32)
     model_cfg.moe_temperature = data['cfg'].get('moe_temperature', 1.0)
     model_cfg.moe_dropout = data['cfg'].get('moe_dropout', 0.0)
+    # ReCK controls (for echmo_reck).
+    model_cfg.reck_mode = data['cfg'].get('reck_mode', data['cfg'].get('ReCK_MODE', 'reck2'))
+    model_cfg.reck_modules = data['cfg'].get('reck_modules', data['cfg'].get('ReCK_Module', 'all'))
+    model_cfg.reck_alpha = data['cfg'].get('reck_alpha', data['cfg'].get('ReCK_Alpha', 0.3))
+    model_cfg.reck_alpha_lmf = data['cfg'].get('reck_alpha_lmf', data['cfg'].get('ReCK_Alpha_LMF', model_cfg.reck_alpha))
+    model_cfg.reck_alpha_mldc = data['cfg'].get('reck_alpha_mldc', data['cfg'].get('ReCK_Alpha_MLDC', model_cfg.reck_alpha))
+    model_cfg.reck_alpha_gdf = data['cfg'].get('reck_alpha_gdf', data['cfg'].get('ReCK_Alpha_GDF', model_cfg.reck_alpha))
 
     add_temp = False
     if cfg['model'] == 'echmo':
@@ -122,6 +129,8 @@ def main():
         net = EchMoMemo(configs=model_cfg)
     elif cfg['model'] == 'echmo_4moe':
         net = EchMo4MoE(configs=model_cfg)
+    elif cfg['model'] == 'echmo_reck':
+        net = EchMoReCK(configs=model_cfg)
     elif cfg['model'] == 'echmo_wide':
         net = EchMoWide(configs=model_cfg)
     elif cfg['model'] == 'rechmo':
@@ -181,7 +190,7 @@ def main():
         train_kwargs['checkpoint_path'] = cfg.get('checkpoint_path')
         train_kwargs['use_global_dataset'] = bool(cfg.get('use_global_dataset', False))
 
-    if cfg['model'] in ['mvnet', 'fcn8s', 'unet', 'deeplabv3plus', 'kuradnet', 'kuradnet_wskip', 'pkcin4any_2d', 'ecoss', 'echmo', 'echmo_4moe', 'echmo_deep', 'echmo_memo', 'echmo_wide', 'rechmo']:
+    if cfg['model'] in ['mvnet', 'fcn8s', 'unet', 'deeplabv3plus', 'kuradnet', 'kuradnet_wskip', 'pkcin4any_2d', 'ecoss', 'echmo', 'echmo_4moe', 'echmo_reck', 'echmo_deep', 'echmo_memo', 'echmo_wide', 'rechmo']:
         trainer.train(add_temp=False, **train_kwargs)
     else:
         trainer.train(add_temp=True, **train_kwargs)

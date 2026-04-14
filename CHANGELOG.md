@@ -4,6 +4,52 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.1.2] - 2026-04-14
+
+### Added
+
+- Added non-intrusive ReCK-ready EchMo variant:
+  - `svrss/models/echmo_reck.py`
+- Added ReCK model routing and config pass-through in entrypoints:
+  - `svrss/run_echmo.py`
+  - `svrss/profile_echmo_train_stages.py`
+  - `svrss/models/__init__.py`
+- Added ReCK contrast configs for LSFJamming:
+  - `svrss/config_files/echmo_reck_itc_scale.json`
+  - `svrss/config_files/echmo_reck0_itc_scale.json`
+  - `svrss/config_files/echmo_reck1_itc_scale.json`
+  - `svrss/config_files/echmo_reck2_itc_scale.json`
+  - `svrss/config_files/echmo_reck3_itc_scale.json`
+
+### Changed
+
+- Updated EchMo family scale configs (`4moe`, `deep`, `memo`) for current improved-trainer experiment settings.
+- Updated LSFJamming split ratio in `svrss/loaders/dataset.py`.
+- Updated README update log and package metadata for this release.
+
+### Fixed
+
+- Fixed dtype mismatch in `svrss/models/echmo_4moe.py` MoE gate path by aligning gate features and fusion weights dtype/device.
+
+### Removed
+
+- Removed obsolete debug/ablation artifacts from active tree:
+  - `svrss/config_files/echmo_ablation_ldc_channels4_scale.json`
+  - `svrss/config_files/echmo_ablation_lmf_layers2_scale.json`
+  - `svrss/config_files/echmo_itc_scale_lmf1.json`
+  - `svrss/config_files/ecoss.json`
+  - `svrss/models/echmo_debug (copy).py`
+  - `svrss/models/echonet_debug.py`
+  - `svrss/models/echonet_debug_cw.py`
+  - `svrss/models/ecoss.py`
+
+### Version
+
+- Project version bumped to `1.1.2` in:
+  - `README.md`
+  - `setup.py`
+  - `CHANGELOG.md`
+
 ## [1.1.1] - 2026-04-07
 
 ### Added

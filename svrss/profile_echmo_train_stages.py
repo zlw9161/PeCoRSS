@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from svrss.learners.initializer import Initializer
 from svrss.loaders.dataloaders import PeCoRSVDataset
-from svrss.models import EchMo, EchMo4MoE, EchMoDeep, EchMoMemo, EchMoWide, rEchMo
+from svrss.models import EchMo, EchMo4MoE, EchMoDeep, EchMoMemo, EchMoReCK, EchMoWide, rEchMo
 from svrss.utils.distributed_utils import get_rank, get_world_size, init_distributed_mode
 from svrss.utils.functions import define_loss, get_transformations, normalize
 from svrss.utils.paths import Paths
@@ -87,6 +87,12 @@ def _build_model_cfg(cfg, data_cfg):
     model_cfg.moe_gate_hidden = data_cfg.get("moe_gate_hidden", 32)
     model_cfg.moe_temperature = data_cfg.get("moe_temperature", 1.0)
     model_cfg.moe_dropout = data_cfg.get("moe_dropout", 0.0)
+    model_cfg.reck_mode = data_cfg.get("reck_mode", data_cfg.get("ReCK_MODE", "reck2"))
+    model_cfg.reck_modules = data_cfg.get("reck_modules", data_cfg.get("ReCK_Module", "all"))
+    model_cfg.reck_alpha = data_cfg.get("reck_alpha", data_cfg.get("ReCK_Alpha", 0.3))
+    model_cfg.reck_alpha_lmf = data_cfg.get("reck_alpha_lmf", data_cfg.get("ReCK_Alpha_LMF", model_cfg.reck_alpha))
+    model_cfg.reck_alpha_mldc = data_cfg.get("reck_alpha_mldc", data_cfg.get("ReCK_Alpha_MLDC", model_cfg.reck_alpha))
+    model_cfg.reck_alpha_gdf = data_cfg.get("reck_alpha_gdf", data_cfg.get("ReCK_Alpha_GDF", model_cfg.reck_alpha))
     return model_cfg
 
 
@@ -99,6 +105,8 @@ def _build_model(cfg, model_cfg):
         return EchMoMemo(configs=model_cfg)
     if cfg["model"] == "echmo_4moe":
         return EchMo4MoE(configs=model_cfg)
+    if cfg["model"] == "echmo_reck":
+        return EchMoReCK(configs=model_cfg)
     if cfg["model"] == "echmo_wide":
         return EchMoWide(configs=model_cfg)
     if cfg["model"] == "rechmo":

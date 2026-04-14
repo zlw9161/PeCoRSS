@@ -651,7 +651,7 @@ If you find PeCoRSS useful in your research, please consider citing the followin
 | Field | Info |
 |:------|:-----|
 | **Package** | `pecorss` |
-| **Version** | `1.1.1` |
+| **Version** | `1.1.2` |
 | **License** | Apache 2.0 |
 | **Repository** | [https://github.com/zlw9161](https://github.com/zlw9161) |
 | **Contact** | lwzhang9161@126.com |
@@ -678,25 +678,29 @@ For detailed release notes and version history, see [CHANGELOG.md](./CHANGELOG.m
 
 ---
 
-## 📝 Update Log (v1.1.1)
+## 📝 Update Log (v1.1.2)
 
-### EchMo Family and Runtime Metrics
+### ReCK Integration and EchMo Family Updates
 
-- Added formal EchMo module `svrss/models/echmo.py` and switched family variants (`deep`, `wide`, `4moe`, `memo`) to import from formal path.
-- Added `pack_feat` runtime options (`apiq`, `ap`, `iq`, `amp`) for EchMo feature packing experiments.
-- Added improved-trainer runtime metrics logging into results artifacts:
-  - step latency (`runtime_metrics.avg_step_latency_ms`)
-  - peak GPU memory (`runtime_metrics.peak_gpu_memory_mb`)
-  - trainable parameters (`model_profile.trainable_params`)
-  - FLOPs when available (`model_profile.flops_per_sample`)
-- Added DDP-compatible FLOPs profiling behavior (rank0 profiling + status record).
+- Added a non-intrusive ReCK model variant `echmo_reck` based on the fixed EchMo backbone:
+  - new model file `svrss/models/echmo_reck.py`
+  - integrated routing in `svrss/run_echmo.py` and `svrss/profile_echmo_train_stages.py`
+  - export wiring in `svrss/models/__init__.py`
+- Added ReCK experiment configs for direct contrast runs:
+  - `echmo_reck_itc_scale.json`
+  - `echmo_reck0_itc_scale.json`
+  - `echmo_reck1_itc_scale.json`
+  - `echmo_reck2_itc_scale.json`
+  - `echmo_reck3_itc_scale.json`
+- Fixed MoE gate dtype mismatch in `svrss/models/echmo_4moe.py` for mixed dtype inputs.
 
-### Experiment Documentation
+### Config and Dataset Adjustments
 
-- Added EchMo family user manual and scale experiment template.
-- Added R1 validation plan with fillable run record tables for direct in-plan tracking.
+- Updated selected EchMo family configs for current LSFJamming scale experiments.
+- Updated LSFJamming train/val/test split ratio in `svrss/loaders/dataset.py`.
+- Cleaned up obsolete debug/ablation config and model files from active tree.
 
 ### Notes
 
 - Detailed release notes are available in [CHANGELOG.md](./CHANGELOG.md).
-- Current package version is `1.1.1`.
+- Current package version is `1.1.2`.

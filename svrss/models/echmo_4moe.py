@@ -72,6 +72,9 @@ class EchMo4MoE(nn.Module):
 
     def _get_expert_weights(self, x):
         feats = self._extract_gate_features(x)
+        # Keep gate input dtype/device aligned with gate parameters under mixed dtypes.
+        ref = self.gate[0].weight
+        feats = feats.to(dtype=ref.dtype, device=ref.device)
         logits = self.gate(feats) / self.moe_temperature
         weights = torch.softmax(logits, dim=-1)
 
@@ -88,5 +91,6 @@ class EchMo4MoE(nn.Module):
         weights = self._get_expert_weights(x)  # [B, E]
         expert_logits = [expert(x) for expert in self.experts]  # E * [B, K, P, R]
         stacked = torch.stack(expert_logits, dim=1)  # [B, E, K, P, R]
+        weights = weights.to(dtype=stacked.dtype, device=stacked.device)
         fused = (stacked * weights[:, :, None, None, None]).sum(dim=1)
         return fused

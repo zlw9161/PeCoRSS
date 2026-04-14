@@ -15,7 +15,7 @@ class LSFJamming:
         self.train = dict()
         self.validation = dict()
         self.test = dict()
-        self.ratio_spilt = [0.7, 0.2, 0.1]
+        self.ratio_spilt = [0.7, 0.1, 0.2]
         self._split()
 
     def _load_data_seq_ref(self):
