@@ -21,7 +21,7 @@ def main():
     parser.add_argument('--dataset', default='Carrada_RD', help='dataset for model training,\
                         options: Carrada_RD, Carrada_RA, CarradaRAC_RD, CarradaRAC_RA, CWRdata, PDRdata, RDSyn, XPDdata, NuaaSim, LSFJamming', type=str)
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
-    parser.add_argument('--sync-bn', dest='sync_bn', help='Use sync batch norm', action='store_true')
+    parser.add_argument('--sync-bn', '--sync_bn', dest='sync_bn', help='Use sync batch norm', action='store_true')
     parser.add_argument('--finetune', help='the finetune path of model', action='store_true')
     parser.add_argument('--profile', action='store_true', help='Run THOP FLOPs profiling before training')
     args = parser.parse_args()

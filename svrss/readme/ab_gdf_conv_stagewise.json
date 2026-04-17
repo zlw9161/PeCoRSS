@@ -1,0 +1,24 @@
+{
+  "lmf_forward": 1.657758397050202,
+  "mldc_forward": 0.6489798077382147,
+  "gdf_forward": 6.723804585635662,
+  "pack_forward": 0.27589721139520407,
+  "lmf_backward": 18.279344600159675,
+  "mldc_backward": 2.2814676049165428,
+  "gdf_backward": 636.7105501936749,
+  "pack_backward": 1.1535827768966556,
+  "frontend_stagewise_backward_total": 658.4249451756477,
+  "world_size": 1,
+  "warmup_iters": 2,
+  "measure_iters": 5,
+  "config": "config_files/echmo_itc_gdf_conv_ab.json",
+  "batch_size_per_rank": 8,
+  "num_workers": 4,
+  "notes": {
+    "lmf_backward": "backward through LMF only, using the gradient at the LMF output boundary",
+    "mldc_backward": "backward through MLDC only, using the gradient at the MLDC output boundary",
+    "gdf_backward": "backward through GDF only, using the gradient at the GDF output boundary",
+    "pack_backward": "backward through the pack operation only, from packed real-valued features to complex GDF output",
+    "frontend_stagewise_backward_total": "lmf_backward + mldc_backward + gdf_backward + pack_backward in the staged harness"
+  }
+}

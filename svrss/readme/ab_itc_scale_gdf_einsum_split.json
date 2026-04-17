@@ -1,0 +1,20 @@
+{
+  "frontend_forward": 1052.7872790116817,
+  "head_forward": 29.769903669754665,
+  "head_backward": 81.79313699171568,
+  "frontend_backward": 677.6543030088457,
+  "split_backward_total": 759.4474400005614,
+  "world_size": 1,
+  "warmup_iters": 3,
+  "measure_iters": 6,
+  "config": "config_files/echmo_itc_scale_gdf_einsum_ab.json",
+  "batch_size_per_rank": 4,
+  "num_workers": 4,
+  "notes": {
+    "frontend_forward": "forward through normalization + LMF + MLDC + GDF + pack",
+    "head_forward": "forward through RDTranslator only",
+    "head_backward": "backward from loss to RDTranslator params and packed frontend feature tensor only",
+    "frontend_backward": "backward from packed frontend feature gradient through EchMo frontend only",
+    "split_backward_total": "head_backward + frontend_backward in the decomposed profiling harness"
+  }
+}

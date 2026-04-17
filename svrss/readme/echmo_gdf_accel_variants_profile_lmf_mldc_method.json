@@ -1,0 +1,216 @@
+{
+  "baseline_conv": {
+    "tag": "baseline_conv",
+    "cfg_overrides": {
+      "gdf_impl": "conv"
+    },
+    "profiling": {
+      "warmup_iters": 1,
+      "measure_iters": 2
+    },
+    "forward_ms": {
+      "Normalize": 0.58009396889247,
+      "LMF": 426.0505725105759,
+      "MLDC": 741.6710949910339,
+      "GDF": 18.705974507611245,
+      "FeatPack": 0.2027400187216699,
+      "RDTranslator": 29.279644979396835,
+      "Loss": 0.46669799485243857,
+      "End-to-End": 1055.059820500901
+    },
+    "backward_ms": {
+      "Normalize": 1.555882510729134,
+      "LMF": 718.8992124865763,
+      "MLDC": 100.95801850548014,
+      "GDF": 45.37768100271933,
+      "FeatPack": 0.7312610105145723,
+      "RDTranslator": 79.94677597889677,
+      "Loss": 0.5051555053796619,
+      "End-to-End": 749.1001524904277
+    },
+    "forward_mem_mb": {
+      "Normalize": 24.515625,
+      "LMF": 1061.92333984375,
+      "MLDC": 7424.0,
+      "GDF": 1590.00048828125,
+      "FeatPack": 36.0,
+      "RDTranslator": 1746.265625,
+      "Loss": 18.0009765625,
+      "End-to-End": 7940.5
+    },
+    "backward_mem_mb": {
+      "Normalize": 32.0,
+      "LMF": 304.94384765625,
+      "MLDC": 3072.0,
+      "GDF": 5316.58837890625,
+      "FeatPack": 74.00048828125,
+      "RDTranslator": 528.36328125,
+      "Loss": 23.99951171875,
+      "End-to-End": 1394.6484375
+    },
+    "params": {
+      "Normalize": 0,
+      "LMF": 1745664,
+      "MLDC": 147840,
+      "GDF": 12583680,
+      "FeatPack": 0,
+      "RDTranslator": 1198023,
+      "Loss": 0,
+      "End-to-End": 15675207
+    },
+    "ops": {
+      "Normalize": "N/A",
+      "LMF": "457.481 GMAC (analytic)",
+      "MLDC": "38.655 GMAC (analytic)",
+      "GDF": "25.770 GMAC (analytic)",
+      "FeatPack": "N/A",
+      "RDTranslator": "326.149 GFLOPs (THOP)",
+      "Loss": "N/A",
+      "End-to-End": "N/A"
+    },
+    "dtypes": {
+      "input_dtype": {
+        "Normalize": "torch.complex128",
+        "LMF": "torch.complex64",
+        "MLDC": "torch.complex64",
+        "GDF": "torch.complex64",
+        "FeatPack": "torch.complex64",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32 + torch.int64",
+        "End-to-End": "torch.complex128"
+      },
+      "compute_dtype": {
+        "Normalize": "torch.complex64",
+        "LMF": "torch.float32",
+        "MLDC": "torch.float32",
+        "GDF": "torch.float32",
+        "FeatPack": "torch.complex64",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32",
+        "End-to-End": "torch.float32"
+      },
+      "output_dtype": {
+        "Normalize": "torch.complex64",
+        "LMF": "torch.complex64",
+        "MLDC": "torch.complex64",
+        "GDF": "torch.complex64",
+        "FeatPack": "torch.float32",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32",
+        "End-to-End": "torch.float32"
+      }
+    },
+    "lmf_gmac": 457.48112588799995,
+    "mldc_gmac": 38.654705664000005,
+    "gdf_gmac": 25.769803776,
+    "rd_gflops": 326.149079296,
+    "batch_size": 4
+  },
+  "gdf_einsum": {
+    "tag": "gdf_einsum",
+    "cfg_overrides": {
+      "gdf_impl": "einsum"
+    },
+    "profiling": {
+      "warmup_iters": 1,
+      "measure_iters": 2
+    },
+    "forward_ms": {
+      "Normalize": 0.5528239707928151,
+      "LMF": 429.671017016517,
+      "MLDC": 759.0605969890021,
+      "GDF": 23.10337097151205,
+      "FeatPack": 0.23728050291538239,
+      "RDTranslator": 29.46862648241222,
+      "Loss": 0.42896048398688436,
+      "End-to-End": 1063.3002755057532
+    },
+    "backward_ms": {
+      "Normalize": 2.227841003332287,
+      "LMF": 723.1261970300693,
+      "MLDC": 100.87680150172673,
+      "GDF": 43.41595550067723,
+      "FeatPack": 1.0395650169812143,
+      "RDTranslator": 81.06329600559548,
+      "Loss": 0.6113100389484316,
+      "End-to-End": 750.6016879924573
+    },
+    "forward_mem_mb": {
+      "Normalize": 24.515625,
+      "LMF": 1061.92333984375,
+      "MLDC": 7424.0,
+      "GDF": 786.0,
+      "FeatPack": 36.0,
+      "RDTranslator": 1746.265625,
+      "Loss": 18.0009765625,
+      "End-to-End": 7940.0
+    },
+    "backward_mem_mb": {
+      "Normalize": 32.0,
+      "LMF": 304.94384765625,
+      "MLDC": 3072.0,
+      "GDF": 1560.0029296875,
+      "FeatPack": 73.50048828125,
+      "RDTranslator": 528.36328125,
+      "Loss": 23.99951171875,
+      "End-to-End": 524.36279296875
+    },
+    "params": {
+      "Normalize": 0,
+      "LMF": 1745664,
+      "MLDC": 147840,
+      "GDF": 12583680,
+      "FeatPack": 0,
+      "RDTranslator": 1198023,
+      "Loss": 0,
+      "End-to-End": 15675207
+    },
+    "ops": {
+      "Normalize": "N/A",
+      "LMF": "457.481 GMAC (analytic)",
+      "MLDC": "38.655 GMAC (analytic)",
+      "GDF": "25.770 GMAC (analytic)",
+      "FeatPack": "N/A",
+      "RDTranslator": "326.149 GFLOPs (THOP)",
+      "Loss": "N/A",
+      "End-to-End": "N/A"
+    },
+    "dtypes": {
+      "input_dtype": {
+        "Normalize": "torch.complex128",
+        "LMF": "torch.complex64",
+        "MLDC": "torch.complex64",
+        "GDF": "torch.complex64",
+        "FeatPack": "torch.complex64",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32 + torch.int64",
+        "End-to-End": "torch.complex128"
+      },
+      "compute_dtype": {
+        "Normalize": "torch.complex64",
+        "LMF": "torch.float32",
+        "MLDC": "torch.float32",
+        "GDF": "torch.float32",
+        "FeatPack": "torch.complex64",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32",
+        "End-to-End": "torch.float32"
+      },
+      "output_dtype": {
+        "Normalize": "torch.complex64",
+        "LMF": "torch.complex64",
+        "MLDC": "torch.complex64",
+        "GDF": "torch.complex64",
+        "FeatPack": "torch.float32",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32",
+        "End-to-End": "torch.float32"
+      }
+    },
+    "lmf_gmac": 457.48112588799995,
+    "mldc_gmac": 38.654705664000005,
+    "gdf_gmac": 25.769803776,
+    "rd_gflops": 326.149079296,
+    "batch_size": 4
+  }
+}

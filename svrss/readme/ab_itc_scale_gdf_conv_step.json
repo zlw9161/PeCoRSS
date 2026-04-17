@@ -1,0 +1,20 @@
+{
+  "data": 9.463422155628601,
+  "forward": 931.9493609946221,
+  "loss": 0.4469376678268115,
+  "backward": 751.2531588242078,
+  "optimizer": 3.0236988192579397,
+  "ddp_sync": 0.0,
+  "step_total": 1696.8590930046048,
+  "world_size": 1,
+  "warmup_iters": 3,
+  "measure_iters": 6,
+  "config": "config_files/echmo_itc_scale.json",
+  "batch_size_per_rank": 4,
+  "num_workers": 4,
+  "notes": {
+    "data": "includes nested dataset/dataloader creation, batch fetch, host-to-device copy, and normalize()",
+    "backward": "normal backward timing on the real training step; in DDP this includes overlapped gradient synchronization",
+    "ddp_sync": "estimated as backward_with_sync - backward_no_sync on the same batch; approximate communication overhead, not additive with backward"
+  }
+}

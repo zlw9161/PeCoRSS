@@ -1,0 +1,222 @@
+{
+  "accel_baseline_conv": {
+    "tag": "accel_baseline_conv",
+    "cfg_overrides": {
+      "lmf_impl": "v7",
+      "lmf_chain_impl": "serial",
+      "mldc_impl": "parallel",
+      "gdf_impl": "conv"
+    },
+    "profiling": {
+      "warmup_iters": 3,
+      "measure_iters": 6
+    },
+    "forward_ms": {
+      "Normalize": 0.5955469872181615,
+      "LMF": 127.82330381257148,
+      "MLDC": 25.091335992328823,
+      "GDF": 19.56166266851748,
+      "FeatPack": 0.22757533588446677,
+      "RDTranslator": 30.11577016635177,
+      "Loss": 0.434753824568664,
+      "End-to-End": 199.94102600806704
+    },
+    "backward_ms": {
+      "Normalize": 2.1831331735787294,
+      "LMF": 520.163351825128,
+      "MLDC": 48.73362564831041,
+      "GDF": 45.76076085019546,
+      "FeatPack": 0.9724908450152725,
+      "RDTranslator": 82.33627599353592,
+      "Loss": 0.629069011968871,
+      "End-to-End": 593.606787675526
+    },
+    "forward_mem_mb": {
+      "Normalize": 24.015625,
+      "LMF": 1166.5986328125,
+      "MLDC": 7436.75146484375,
+      "GDF": 1590.1671549479167,
+      "FeatPack": 36.0,
+      "RDTranslator": 1746.265625,
+      "Loss": 18.084309895833332,
+      "End-to-End": 7952.75146484375
+    },
+    "backward_mem_mb": {
+      "Normalize": 32.166666666666664,
+      "LMF": 180.27392578125,
+      "MLDC": 3072.0,
+      "GDF": 5316.74462890625,
+      "FeatPack": 74.90673828125,
+      "RDTranslator": 528.36328125,
+      "Loss": 23.99951171875,
+      "End-to-End": 1394.2942708333333
+    },
+    "params": {
+      "Normalize": 0,
+      "LMF": 1745664,
+      "MLDC": 196992,
+      "GDF": 12583680,
+      "FeatPack": 0,
+      "RDTranslator": 1198023,
+      "Loss": 0,
+      "End-to-End": 15724359
+    },
+    "ops": {
+      "Normalize": "N/A",
+      "LMF": "457.481 GMAC (analytic)",
+      "MLDC": "51.540 GMAC (analytic)",
+      "GDF": "25.770 GMAC (analytic)",
+      "FeatPack": "N/A",
+      "RDTranslator": "326.149 GFLOPs (THOP)",
+      "Loss": "N/A",
+      "End-to-End": "N/A"
+    },
+    "dtypes": {
+      "input_dtype": {
+        "Normalize": "torch.complex128",
+        "LMF": "torch.complex64",
+        "MLDC": "torch.complex64",
+        "GDF": "torch.complex64",
+        "FeatPack": "torch.complex64",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32 + torch.int64",
+        "End-to-End": "torch.complex128"
+      },
+      "compute_dtype": {
+        "Normalize": "torch.complex64",
+        "LMF": "torch.float32",
+        "MLDC": "torch.float32",
+        "GDF": "torch.float32",
+        "FeatPack": "torch.complex64",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32",
+        "End-to-End": "torch.float32"
+      },
+      "output_dtype": {
+        "Normalize": "torch.complex64",
+        "LMF": "torch.complex64",
+        "MLDC": "torch.complex64",
+        "GDF": "torch.complex64",
+        "FeatPack": "torch.float32",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32",
+        "End-to-End": "torch.float32"
+      }
+    },
+    "lmf_gmac": 457.48112588799995,
+    "mldc_gmac": 51.53960755200001,
+    "gdf_gmac": 25.769803776,
+    "rd_gflops": 326.149079296,
+    "batch_size": 4
+  },
+  "accel_gdf_einsum": {
+    "tag": "accel_gdf_einsum",
+    "cfg_overrides": {
+      "lmf_impl": "v7",
+      "lmf_chain_impl": "serial",
+      "mldc_impl": "parallel",
+      "gdf_impl": "einsum"
+    },
+    "profiling": {
+      "warmup_iters": 3,
+      "measure_iters": 6
+    },
+    "forward_ms": {
+      "Normalize": 0.5758326636472096,
+      "LMF": 129.11133215917894,
+      "MLDC": 96.05333500076085,
+      "GDF": 23.425534668300923,
+      "FeatPack": 0.235975671481962,
+      "RDTranslator": 29.714898807772745,
+      "Loss": 0.41880199569277465,
+      "End-to-End": 206.15917399603254
+    },
+    "backward_ms": {
+      "Normalize": 1.917529501952231,
+      "LMF": 526.2185025009481,
+      "MLDC": 48.90125016875876,
+      "GDF": 43.799969008735694,
+      "FeatPack": 1.01659032710207,
+      "RDTranslator": 82.68954234275346,
+      "Loss": 0.5858775111846626,
+      "End-to-End": 593.6712751669498
+    },
+    "forward_mem_mb": {
+      "Normalize": 24.015625,
+      "LMF": 1166.5152994791667,
+      "MLDC": 7436.75146484375,
+      "GDF": 786.0,
+      "FeatPack": 36.0,
+      "RDTranslator": 1746.265625,
+      "Loss": 18.0009765625,
+      "End-to-End": 7952.75146484375
+    },
+    "backward_mem_mb": {
+      "Normalize": 32.166666666666664,
+      "LMF": 180.27392578125,
+      "MLDC": 3072.0,
+      "GDF": 1559.7529296875,
+      "FeatPack": 75.00048828125,
+      "RDTranslator": 528.36328125,
+      "Loss": 24.072428385416668,
+      "End-to-End": 524.4357096354166
+    },
+    "params": {
+      "Normalize": 0,
+      "LMF": 1745664,
+      "MLDC": 196992,
+      "GDF": 12583680,
+      "FeatPack": 0,
+      "RDTranslator": 1198023,
+      "Loss": 0,
+      "End-to-End": 15724359
+    },
+    "ops": {
+      "Normalize": "N/A",
+      "LMF": "457.481 GMAC (analytic)",
+      "MLDC": "51.540 GMAC (analytic)",
+      "GDF": "25.770 GMAC (analytic)",
+      "FeatPack": "N/A",
+      "RDTranslator": "326.149 GFLOPs (THOP)",
+      "Loss": "N/A",
+      "End-to-End": "N/A"
+    },
+    "dtypes": {
+      "input_dtype": {
+        "Normalize": "torch.complex128",
+        "LMF": "torch.complex64",
+        "MLDC": "torch.complex64",
+        "GDF": "torch.complex64",
+        "FeatPack": "torch.complex64",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32 + torch.int64",
+        "End-to-End": "torch.complex128"
+      },
+      "compute_dtype": {
+        "Normalize": "torch.complex64",
+        "LMF": "torch.float32",
+        "MLDC": "torch.float32",
+        "GDF": "torch.float32",
+        "FeatPack": "torch.complex64",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32",
+        "End-to-End": "torch.float32"
+      },
+      "output_dtype": {
+        "Normalize": "torch.complex64",
+        "LMF": "torch.complex64",
+        "MLDC": "torch.complex64",
+        "GDF": "torch.complex64",
+        "FeatPack": "torch.float32",
+        "RDTranslator": "torch.float32",
+        "Loss": "torch.float32",
+        "End-to-End": "torch.float32"
+      }
+    },
+    "lmf_gmac": 457.48112588799995,
+    "mldc_gmac": 51.53960755200001,
+    "gdf_gmac": 25.769803776,
+    "rd_gflops": 326.149079296,
+    "batch_size": 4
+  }
+}

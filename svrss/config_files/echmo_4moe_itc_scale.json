@@ -1,6 +1,7 @@
 {
  "model": "echmo_4moe",
  "trainer_impl": "improved",
+ "checkpoint_path": "PeCoLab/logs/LSFJamming/echmo_4moe/echmo_4moe_e300_lr0.0001_lsf_wce_4moes-top2-gating_666/results/echmo_4moe_checkpoint_epoch16.pt",
  "use_global_dataset": true,
  "dataset": "LSFJamming",
  "task_name": "Segmentation",
@@ -43,7 +44,7 @@
  "enable_graph_vis": false,
  "torch_seed": 42,
  "numpy_seed": 42,
- "version": 666,
+ "version": 777,
  "device": "cuda",
  "custom_loss": "lsf_wce",
  "exp_desc": "4moes-top2-gating",

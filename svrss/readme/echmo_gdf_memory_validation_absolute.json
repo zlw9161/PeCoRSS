@@ -1,0 +1,24 @@
+{
+  "config": "config_files/echmo_itc_scale.json",
+  "profiling": {
+    "warmup_iters": 1,
+    "measure_iters": 3,
+    "batch_size": 4
+  },
+  "baseline_conv": {
+    "fwd_alloc_peak_mb": 11988.66162109375,
+    "fwd_reserved_peak_mb": 14038.0,
+    "bwd_alloc_peak_mb": 13377.84130859375,
+    "bwd_reserved_peak_mb": 16218.0,
+    "bwd_alloc_delta_mb": 1393.1796875,
+    "bwd_reserved_delta_mb": 2180.0
+  },
+  "gdf_einsum": {
+    "fwd_alloc_peak_mb": 13552.81787109375,
+    "fwd_reserved_peak_mb": 13874.0,
+    "bwd_alloc_peak_mb": 14072.8369140625,
+    "bwd_reserved_peak_mb": 16986.0,
+    "bwd_alloc_delta_mb": 524.01904296875,
+    "bwd_reserved_delta_mb": 3112.0
+  }
+}

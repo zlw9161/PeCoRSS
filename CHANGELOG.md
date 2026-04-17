@@ -26,10 +26,13 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Updated EchMo family scale configs (`4moe`, `deep`, `memo`) for current improved-trainer experiment settings.
 - Updated LSFJamming split ratio in `svrss/loaders/dataset.py`.
 - Updated README update log and package metadata for this release.
+- Updated EchMo compute profiling and acceleration report artifacts for baseline/LMF/MLDC/GDF and overall baseline-vs-improved comparisons.
+- Updated DDP launch example in `svrss/run_ddp.sh` to use standard SyncBN switch style.
 
 ### Fixed
 
 - Fixed dtype mismatch in `svrss/models/echmo_4moe.py` MoE gate path by aligning gate features and fusion weights dtype/device.
+- Fixed `run_echmo.py` SyncBN CLI robustness by accepting both `--sync-bn` and `--sync_bn`.
 
 ### Removed
 
