@@ -1,0 +1,24 @@
+# Additional dependencies for the visualization app under svrss/app/
+# Install on top of the core pecorss environment
+
+# Deep Learning Framework
+torch>=2.0.0
+
+# Web Interface
+gradio>=5.0.0
+
+# Scientific Computing
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Visualization
+matplotlib>=3.7.0
+plotly>=5.15.0
+Pillow>=10.0.0
+
+# Data Processing
+h5py>=3.9.0
+pandas>=2.0.0
+
+# Model utilities (used by ViT)
+einops>=0.7.0
