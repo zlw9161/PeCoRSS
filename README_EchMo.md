@@ -52,7 +52,54 @@ Run from the repository root:
 pip install -r requirements.txt
 ```
 
-### 2.3 Configure Dataset and Log Paths
+### 2.3 — Optional CUDA Extension for PeakConv Acceleration
+
+> This step is optional, but it is recommended for EchMo models.
+
+```bash
+cd PeCoRSS
+python setup.py develop --with-cuda
+```
+
+If you do not install cuda toolkit, you should download `cuda_12.3.0_545.23.06_linux.run` (this is the recommended cuda version, please check your GPU-CUDA support, e.g., using `nvidia-smi` to check the supported CUDA version). The following instruction is the introduction of installing `cuda_XX.run`:
+
+```bash
+$ cd your_path_to_downloaded_cuda_file
+$ sudo ./cuda_12.3.0_545_23.06_linux.run
+```
+
+Please enter `space` to avoid installing driver again, then enter `install` to run the cuda installation. When the installation complete, please typing:
+
+```bash
+$ nvcc --version
+```
+
+to verify the cuda toolkit installation, if `nvcc` is not available, please add path to `~\.bashrc`;
+
+```bash
+$ vim ~\.bashrc
+```
+
+Add `export PATH="/usr/local/cuda-12.3/bin:$PATH"` under `# >>>conda initialize >>>`. Then
+
+```bash
+$ source ~\.bashrc
+$ nvcc --version
+```
+
+Then go to the step of cuda implementation of PRF gathering.
+
+#### CUDA Acceleration Effects
+
+| Model | GPU Mem. | GMac | FPS | Input Size | #Params |
+|:------|:--------:|:----:|:---:|:----------:|:-------:|
+| PKCIn4CWR | 12007 MB | 162.52 | 29.5 | 1,1,5,124,2048 | 1.21 M |
+| PKCIn4CWR (accelerated) | 5697 MB | 162.52 | 63.7 | 1,1,5,124,2048 | 1.21 M |
+| PKCIn4PDR | 3007 MB | 32.77 | 137.5 | 1,1,5,64,800 | 1.21 M |
+| PKCIn4PDR (accelerated) | 1761 MB | 32.77 | 396.6 | 1,1,5,64,800 | 1.21 M |
+
+
+### 2.4 Configure Dataset and Log Paths
 
 Please review and update:
 
@@ -155,6 +202,8 @@ python -m svrss.infer_echmo --cfg svrss/config_files/rechmo.json --no-quali
 ---
 
 ## 5. App Visualization
+
+![EchMo vs Traditional](images/screenshot_echmo_vs_traditional.png)
 
 Detailed app document see:
 
