@@ -28,7 +28,7 @@ The repository currently supports the following EchMo-family models:
 | echmo_4moe | svrss/config_files/echmo_4moe_itc_scale.json | svrss/run_echmo.py | svrss/infer_echmo.py |
 | echmo_reck | svrss/config_files/echmo_reck_itc_scale.json and reck0/1/2/3 variants | svrss/run_echmo.py | svrss/infer_echmo.py |
 | echmo_wide | svrss/config_files/echmo_wide_itc_scale.json | svrss/run_echmo.py | svrss/infer_echmo.py |
-| rechmo | svrss/config_files/rechmo.json | svrss/run_echmo.py | svrss/infer_echmo.py |
+
 
 Notes:
 - [svrss/run_echmo.py](svrss/run_echmo.py) already includes full model-family branching.
