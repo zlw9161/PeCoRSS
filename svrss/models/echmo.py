@@ -793,7 +793,7 @@ class Group_Purturble_DF(nn.Module):
         # self.batch_norm = ComplexBatchNorm2d(num_features=self.out_ch*self.groups)
         self.cmplx_relu = ComplexReLU(self.activation)
 
-    # weight initialized w/ mfTime, bias (optional)
+    # weight initialized w/ fourier basis, bias (optional)
     def init_fourier_kernels(self):
         coefs = torch.zeros(self.out_ch, self.k_size)
         f, t = torch.meshgrid(torch.arange(1, self.out_ch + 1),

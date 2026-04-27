@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.1.3] - 2026-04-27
+
+### Added
+
+- Added EchMo family inference entrypoint:
+  - `svrss/infer_echmo.py`
+- Added dedicated EchMo family guide:
+  - `README_EchMo.md`
+
+### Changed
+
+- Upgraded project release metadata to `1.1.3`.
+- Synced current repository-wide working changes into this release snapshot.
+
+### Version
+
+- Project version bumped to `1.1.3` in:
+  - `README.md`
+  - `setup.py`
+  - `CHANGELOG.md`
+
 ## [1.1.2] - 2026-04-14
 
 ### Added
