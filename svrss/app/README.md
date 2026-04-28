@@ -40,10 +40,15 @@ svrss/app/
 
 ## Download
 
-This application requires the following resources, which are **not** included in this repository due to file size:
+### Dataset
 
-- **Dataset**: Download from `xxx` and extract to `svrss/app/datasets/`.
-- **Model Weights**: Download from `xxx` and place the `.pt` files under `svrss/app/models/<dataset_name>/<model_folder>/results/`.
+The `datasets/` directory currently contains **sample data only** (`HiL-RED/` and `Syn-RED/` subsets) for demonstration and quick testing. Due to the large scale of the full datasets, we are actively seeking a suitable data-hosting platform. The complete datasets will be released publicly after the paper is accepted.
+
+### Model Weights
+
+Pre-trained model weights are provided in the `ckpts/` folder at the repository root (e.g., `ckpts/echmo_e300_lr0.0001_ce_3/` and `ckpts/echmo_e300_lr0.0001_lsf_wce_0/`). Copy or symlink them to `svrss/app/models/` following the structure expected by `MODEL_PATHS` in `app.py`.
+
+> **Note**: The `.pt` files in `ckpts/` are best-model snapshots and cannot be used to resume training. They are intended for inference and visualization only.
 
 Weight folder names must match the `MODEL_PATHS` configuration in `app.py`.
 

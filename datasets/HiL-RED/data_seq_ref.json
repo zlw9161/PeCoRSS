@@ -1,0 +1,107 @@
+{
+    "deceptive_sli_jammer_-15dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "deceptive_sli_jammer_-20dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "deceptive_dft_jammer_-10dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "deceptive_isr_jammer_-15dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "barrage_wide_jamming_-10dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "deceptive_isr_jammer_-20dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "deceptive_dft_jammer_-15dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "barrage_narrow_jamming_-10dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "barrage_narrow_jamming_-15dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "barrage_wide_jamming_-20dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "deceptive_dft_jammer_-20dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "barrage_narrow_jamming_-20dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "deceptive_sli_jammer_-10dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "barrage_wide_jamming_-15dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    },
+    "deceptive_isr_jammer_-10dB": {
+        "split": [
+            "Train",
+            "Validation",
+            "Test"
+        ]
+    }
+}

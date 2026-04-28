@@ -114,6 +114,22 @@ At minimum, make sure these paths are correct:
 
 > Please note that lsf_jamming is the data_path for RED-HiL dataset in the paper, nuaasim is the path for RED-Syn dataset.
 
+### 2.5 Checkpoint Folder (`ckpts/`)
+
+The repository includes a `ckpts/` folder containing pre-trained model weights:
+
+- `echmo_e300_lr0.0001_ce_3/`: Best-model snapshot for NuaaSim (RED-Syn dataset). **Cannot be used to resume training**.
+- `echmo_e300_lr0.0001_lsf_wce_0/`: Best-model snapshot for LSFJamming (RED-HiL dataset), trained with `nb_classes=9`. **Cannot be used to resume training**.
+- `echmo_e300_lr0.0001_lsf_wce_echmo-lmfv7_serial_nocurl-mldc_para-gdf_einsum-amp_only-leaky_relu-bias-bs4_4-improved_trainer_0/`: Full training checkpoint for LSFJamming, trained with the `nb_classes=7`. This is the pre-trained weight of the **EchMo$^\dagger$** model reported in the paper. Contains regular checkpoint files (e.g., `_checkpoint_epoch*.pt`) and **can be used to resume or continue training**.
+
+> **LSFJamming Class-Number Note**: The LSFJamming dataset contains **7 valid classes**.
+> - When using the `lsf_wce_0` model (trained with 9 classes), exclude the last two class indices (7 and 8) during mIoU / Dice calculation.
+> - The `improved_trainer_0` model was trained with the correct 7-class setting and does not require such exclusion.
+
+### 2.6 Dataset Folder (`datasets/`)
+
+The `datasets/` directory currently contains **sample data only** (`HiL-RED/` and `Syn-RED/` subsets) for demonstration and quick testing. Due to the large scale of the full datasets, we are actively seeking a suitable data-hosting platform. The complete datasets will be released publicly after the paper is accepted.
+
 ---
 
 ## 3. Training: Full EchMo Family

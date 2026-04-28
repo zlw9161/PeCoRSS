@@ -1,0 +1,47 @@
+{
+    "barrage_narrow_jamming_-10dB": [
+        "2025090809332621314"
+    ],
+    "barrage_narrow_jamming_-15dB": [
+        "202509082203273504"
+    ],
+    "barrage_narrow_jamming_-20dB": [
+        "202509091239203879"
+    ],
+    "barrage_wide_jamming_-10dB": [
+        "20250901111636100764"
+    ],
+    "barrage_wide_jamming_-15dB": [
+        "202509021530465441"
+    ],
+    "barrage_wide_jamming_-20dB": [
+        "202509031652503690"
+    ],
+    "deceptive_dft_jammer_-10dB": [
+        "202509092208275264"
+    ],
+    "deceptive_dft_jammer_-15dB": [
+        "202509102013124057"
+    ],
+    "deceptive_dft_jammer_-20dB": [
+        "202509112218344171"
+    ],
+    "deceptive_isr_jammer_-10dB": [
+        "202509121322404022"
+    ],
+    "deceptive_isr_jammer_-15dB": [
+        "202509122330044379"
+    ],
+    "deceptive_isr_jammer_-20dB": [
+        "202509151757054278"
+    ],
+    "deceptive_sli_jammer_-10dB": [
+        "202509160330105009"
+    ],
+    "deceptive_sli_jammer_-15dB": [
+        "202509170155574228"
+    ],
+    "deceptive_sli_jammer_-20dB": [
+        "202509241610546885"
+    ]
+}
