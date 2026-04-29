@@ -8,7 +8,8 @@ class Carrada:
 
     def __init__(self):
         self.paths = Paths().get()
-        self.carrada = self.paths['Carrada']
+        self.warehouse = self.paths['warehouse']
+        self.carrada = self.paths['carrada']
         self.data_seq_ref = self._load_data_seq_ref()
         self.annotations = self._load_dataset_ids()
         self.train = dict()

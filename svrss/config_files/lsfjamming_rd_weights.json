@@ -1,9 +1,0 @@
-{
-    "Background": 1.7484874410795395e-06,
-    "Target": 0.014355450476659964,
-    "deceptive_dft_jammer": 0.02244898872050192,
-    "deceptive_isr_jammer": 0.01663415138015991,
-    "deceptive_sli_jammer": 0.025077017671922122,
-    "barrage_wide_jamming": 4.6605783990100195e-06,
-    "barrage_narrow_jamming": 4.688167815434384e-06
-}

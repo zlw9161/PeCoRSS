@@ -4,22 +4,19 @@ import numpy as np
 import torch
 import torch.nn as nn
 from PIL import Image
-from fnmatch import fnmatch
 
-from svrss.utils import SVRSS_HOME
+from svrss.utils import MVRSS_HOME
 from svrss.losses.soft_dice import SoftDiceLoss
-from svrss.losses.soft_dice_v2 import SoftDiceLossV2
 from svrss.losses.coherence import CoherenceLoss
-from svrss.losses.focal_loss import FocalLoss
 from svrss.losses.soft_coherence import SoftCoherenceLoss
 from svrss.losses.sparse_coherence import SparseCoherenceLoss
 from svrss.losses.smospa_coherence import SmoSpaCoherenceLoss
 from svrss.losses.distribution_coherence import DistributionCoherenceLoss
 from svrss.losses.denoise_coherence import DenoiseCoherenceLoss
-from svrss.loaders.dataloaders import Rescale, Flip, HFlip, VFlip
+from svrss.loaders.dataloaders_mm import Rescale, Flip, HFlip, VFlip
 
 
-def get_class_weights(dataset_type, signal_type):
+def get_class_weights(signal_type):
     """Load class weights for custom loss
 
     PARAMETERS
@@ -31,64 +28,18 @@ def get_class_weights(dataset_type, signal_type):
     -------
     weights: numpy array
     """
-    weight_path = SVRSS_HOME / 'config_files'
-    
-    if dataset_type == 'CWRdata':
-        file_name = 'cwr'
-    elif dataset_type == 'PDRdata':
-        file_name = 'pdr'
-    elif dataset_type == 'RDSyn':
-        file_name = 'rd17'
-    elif dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
-        file_name = 'carrada'
-    elif dataset_type == 'LSFJamming':
-        file_name = 'lsfjamming'
+    weight_path = MVRSS_HOME / 'config_files'
+    if signal_type in ('range_angle'):
+        file_name = 'ra_weights.json'
+    elif signal_type in ('range_doppler'):
+        file_name = 'rd_weights.json'
     else:
-        file_name = None
-    
-    if signal_type in ('range_angle') and file_name is not None:
-        file_name = file_name + '_' + 'ra_weights.json'
-    elif signal_type in ('range_doppler') and file_name is not None:
-        file_name = file_name + '_' + 'rd_weights.json'
-    else:
-        print(f'>>>| Warning: Dataset type {dataset_type} is not supported for loading class weights. \n'
-              f'Defaulting to uniform or pre-set weights.')
-        print(f'>>>| Tips: If you want to use custom weights, please add a json file named as: \n'
-              f'dataname_rd(or ra)_weights.json in the config_files folder, with the format: \n'
-              f'    - {{"Background": 0.1, "UAV": 0.2, "Pedestrian": 0.2, "Car": 0.2, "Boat": 0.3}} for PDRdata; \n'
-              f'    - {{"background": 0.1, "target": 0.9}} for RDSyn; \n')
-    
-    if file_name is not None:
-        file_path = weight_path / file_name
-        with open(file_path, 'r') as fp:
-            weights = json.load(fp)
-    else:
-        weights = None
-    
-    if dataset_type == 'CWRdata':
-        weights = np.array([weights['Background'], weights['UAV'],
-                        weights['Pedestrian'], weights['Vehicle']])
-    elif dataset_type == 'PDRdata':
-        weights = np.array([weights['Background'], weights['UAV'],
-                        weights['Pedestrian'], weights['Car'],
-                        weights['Boat']])
-    elif dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
-        weights = np.array([weights['background'], weights['pedestrian'],
+        raise ValueError('Signal type {} is not supported.'.format(signal_type))
+    file_path = weight_path / file_name
+    with open(file_path, 'r') as fp:
+        weights = json.load(fp)
+    weights = np.array([weights['background'], weights['pedestrian'],
                         weights['cyclist'], weights['car']])
-    elif dataset_type in ['RDSyn']:
-        weights = np.array([weights['background'], weights['target']])
-    elif dataset_type in ['LSFJamming']:
-        weights = np.array([weights['Background'], weights['Target'], weights['deceptive_dft_jammer'],
-                            weights['deceptive_isr_jammer'], weights['deceptive_sli_jammer'], weights['barrage_wide_jamming'],
-                            weights['barrage_narrow_jamming']])
-    elif dataset_type == 'XPDdata':
-        weights = np.array([0.1, 0.9])
-    elif dataset_type == 'NuaaSim':
-        # Extreme pixel imbalance for foreground in NuaaSim:
-        # keep background weight near zero and strongly up-weight class-1.
-        weights = np.array([0.0002, 0.9998])
-    else:
-        raise ValueError('Dataset type {} is not supported.'.format(dataset_type))
     weights = torch.from_numpy(weights)
     return weights
 
@@ -155,13 +106,10 @@ def get_metrics(metrics, loss, losses=None):
     metrics_values['miou_by_class'] = miou_by_class.tolist()
     metrics_values['dice'] = dice
     metrics_values['dice_by_class'] = dice_by_class.tolist()
-    # lt@20240311 add confusion matrix
-    conf_matrix = metrics.get()
-    metrics_values['confusion_matrix'] = conf_matrix.tolist()
     return metrics_values
 
 
-def normalize(data, dataset_type, signal_type, norm_type='local'):
+def normalize(data, signal_type, norm_type='local'):
     """
     Method to normalise the radar views
 
@@ -181,81 +129,51 @@ def normalize(data, dataset_type, signal_type, norm_type='local'):
     norm_data: numpy array
         normalised radar view
     """
-    if dataset_type == 'CWRdata':
-        file_name = 'cwr'
-    elif dataset_type == 'PDRdata':
-        file_name = 'pdr'
-    elif dataset_type == 'XPDdata':
-        file_name = 'xpd'
-    elif dataset_type == 'RDSyn':
-        file_name = 'rd17'
-    elif dataset_type == 'NuaaSim':
-        file_name = 'nuaasim'
-    elif dataset_type == 'LSFJamming':
-        file_name = 'lsf'
-    elif dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
-        file_name = 'carrada'
-    else:
-        raise ValueError('Dataset type {} is not supported.'.format(dataset_type))
-    
     if norm_type in ('local'):
         min_value = torch.min(data)
         max_value = torch.max(data)
         norm_data = torch.div(torch.sub(data, min_value), torch.sub(max_value, min_value))
         return norm_data
 
-    if norm_type in ('instance'):
-        # normalize in the network
-        return data
-
     elif signal_type == 'range_doppler':
-        if norm_type in ('tvt', 'std'):
-            file_path = SVRSS_HOME / 'config_files' / (file_name + '_' + 'rd_stats_all.json')
+        if norm_type == 'tvt':
+            file_path = MVRSS_HOME / 'config_files' / 'rd_stats_all.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
             rd_stats = json.load(fp)
         min_value = torch.tensor(rd_stats['min_val'])
         max_value = torch.tensor(rd_stats['max_val'])
-        mean_value = torch.tensor(rd_stats['mean'])
-        std_value = torch.tensor(rd_stats['std'])
 
     elif signal_type == 'range_angle':
-        if norm_type in ('tvt', 'std'):
-            file_path = SVRSS_HOME / 'config_files' / (file_name + '_' + 'ra_stats_all.json')
+        if norm_type == 'tvt':
+            file_path = MVRSS_HOME / 'config_files' / 'ra_stats_all.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
             ra_stats = json.load(fp)
         min_value = torch.tensor(ra_stats['min_val'])
         max_value = torch.tensor(ra_stats['max_val'])
-        mean_value = torch.tensor(ra_stats['mean'])
-        std_value = torch.tensor(ra_stats['std'])
 
     elif signal_type == 'angle_doppler':
-        if norm_type in ('tvt', 'std'):
-            file_path = SVRSS_HOME / 'config_files' / (file_name + '_' + 'ad_stats_all.json')
+        if norm_type == 'tvt':
+            file_path = MVRSS_HOME / 'config_files' / 'ad_stats_all.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
             ad_stats = json.load(fp)
         min_value = torch.tensor(ad_stats['min_val'])
         max_value = torch.tensor(ad_stats['max_val'])
-        mean_value = torch.tensor(ad_stats['mean'])
-        std_value = torch.tensor(ad_stats['std'])
 
     else:
         raise TypeError('Signal {} is not supported.'.format(signal_type))
 
-    if norm_type == 'tvt':
-        norm_data = torch.div(torch.sub(data, min_value),
-                            torch.sub(max_value, min_value))
-    elif norm_type == 'std':
-        norm_data = torch.div(torch.sub(data, mean_value), std_value)
+    norm_data = torch.div(torch.sub(data, min_value),
+                          torch.sub(max_value, min_value))
     return norm_data
 
 
-def define_loss(dataset_type, signal_type, custom_loss, device, focal_gamma=None):
+def define_loss(signal_type, custom_loss, device):
     """
     Method to define the loss to use during training
 
@@ -271,66 +189,22 @@ def define_loss(dataset_type, signal_type, custom_loss, device, focal_gamma=None
     devide: str
         Supported: 'cuda' or 'cpu'
     """
-    if custom_loss == 'ce':
-        loss = [nn.CrossEntropyLoss(), lambda x, y: torch.tensor(0., device=x.device)]
-    elif custom_loss == 'lsf_wce':
-        class_weights = [0.01748487, 1., 1., 1., 1., 0.04660571, 0.04688167]
-        class_weights = torch.tensor(class_weights, dtype=torch.float32, device=device)
-        loss = [nn.CrossEntropyLoss(weight=class_weights), lambda x, y: torch.tensor(0., device=x.device)]
-    elif custom_loss == 'wce':
-        weights = get_class_weights(dataset_type, signal_type)
-        loss = [nn.CrossEntropyLoss(weight=weights.to(device).float()), lambda x, y: torch.tensor(0., device=x.device)]
+    if custom_loss == 'wce':
+        weights = get_class_weights(signal_type)
+        loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
     elif custom_loss == 'sdice':
-        loss = [SoftDiceLoss(), lambda x, y: torch.tensor(0., device=x.device)]
-    elif custom_loss == 'focal':
-        gamma = 2 if focal_gamma is None else float(focal_gamma)
-        loss = [FocalLoss(weight=None, gamma=gamma), lambda x, y: torch.tensor(0., device=x.device)]
+        loss = SoftDiceLoss()
     elif custom_loss == 'wce_w10sdice':
-        weights = get_class_weights(dataset_type, signal_type)
+        weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, SoftDiceLoss(global_weight=10.)]
-    elif fnmatch(custom_loss, 'wfocal_w*sdice'):
-        weights = get_class_weights(dataset_type, signal_type)
-        # ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
-        gamma = 4 if focal_gamma is None else float(focal_gamma)
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=1., gamma=gamma)
-        loss = [focal_loss, SoftDiceLoss(global_weight=float(custom_loss[8:-5]))]
-    # lt@20230610 for cwr dataset
-    elif custom_loss == 'w20focal_wesub1sdicev2':
-        weights = get_class_weights(dataset_type, signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=20.)
-        loss = [focal_loss, SoftDiceLossV2(global_weight=1e-1)]
     elif custom_loss == 'wce_w10sdice_w5col':
-        weights = get_class_weights(dataset_type, signal_type)
+        weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, SoftDiceLoss(global_weight=10.), CoherenceLoss(global_weight=5.)]
-    # lt @20230412
-    # lt @20230416 调整focal loss权重为20
-    elif custom_loss == 'w20focal_w10sdice_w5col':
-        weights = get_class_weights(dataset_type, signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=20.)
-        loss = [focal_loss, SoftDiceLoss(global_weight=10.), CoherenceLoss(global_weight=5.)]
-    elif custom_loss == 'wfocal_w10sdice_w5col':
-        weights = get_class_weights(dataset_type, signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=1.)
-        loss = [focal_loss, SoftDiceLoss(global_weight=10.), CoherenceLoss(global_weight=5.)]
-    # lt @20230412
-    elif custom_loss == 'wfocal_w10sdicev2_w5col':
-        weights = get_class_weights(dataset_type, signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float())
-        loss = [focal_loss, SoftDiceLossV2(global_weight=10.), CoherenceLoss(global_weight=5.)]
-    # lt @20230416
-    elif custom_loss == 'w20focal_wesub2sdicev2_w5col':
-        weights = get_class_weights(dataset_type, signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=20.)
-        loss = [focal_loss, SoftDiceLossV2(global_weight=1e-2), CoherenceLoss(global_weight=5.)]
-    elif custom_loss == 'w20focal_wesub1sdicev2_w5col':
-        weights = get_class_weights(dataset_type, signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=20.)
-        loss = [focal_loss, SoftDiceLossV2(global_weight=1e-1), CoherenceLoss(global_weight=5.)]
     # zlw@20220302
     elif custom_loss == 'wce_w10sdice_w5col_sig_blnc':
-        weights = get_class_weights(dataset_type, signal_type)
+        weights = get_class_weights(signal_type)
         loss_weight = get_loss_weight(signal_type)
         weights = loss_weight*weights
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
@@ -340,7 +214,7 @@ def define_loss(dataset_type, signal_type, custom_loss, device, focal_gamma=None
                 CoherenceLoss(global_weight=5.)]
     # zlw@20220304
     elif custom_loss == 'wce_w10sdice_w5sofcol':
-        weights = get_class_weights(dataset_type, signal_type)
+        weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         ce_loss = ce_loss
         loss = [ce_loss, 
@@ -348,28 +222,28 @@ def define_loss(dataset_type, signal_type, custom_loss, device, focal_gamma=None
                 SoftCoherenceLoss(global_weight=5., relax_factor=0.2, margin=0.01)]
     # zlw@20220321
     elif custom_loss == 'wce_w10sdice_w5spacol':
-        weights = get_class_weights(dataset_type, signal_type)
+        weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, 
                 SoftDiceLoss(global_weight=10.), 
                 SparseCoherenceLoss(global_weight=5.)]
     # zlw@20220322
     elif custom_loss == 'wce_w10sdice_w5smospacol':
-        weights = get_class_weights(dataset_type, signal_type)
+        weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, 
                 SoftDiceLoss(global_weight=10.), 
                 SmoSpaCoherenceLoss(global_weight=5.)]
     # zlw@20220322
     elif custom_loss == 'wce_w10sdice_w5discol':
-        weights = get_class_weights(dataset_type, signal_type)
+        weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, 
                 SoftDiceLoss(global_weight=10.), 
                 DistributionCoherenceLoss(global_weight=5.)]
     # zlw@20220324
     elif custom_loss == 'wce_w10sdice_w5dnscol':
-        weights = get_class_weights(dataset_type, signal_type)
+        weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, 
                 SoftDiceLoss(global_weight=10.), 
@@ -404,25 +278,18 @@ def get_transformations(transform_names, split='train', sizes=None):
     return transformations
 
 
-def mask_to_img(mask, num_class):
-    """Generate colors per class, only <=7 classes are supported"""
-    # red, green, blue, yellow, cyan, white
-    colors = [[255, 0, 0],
-              [0, 255, 0],
-              [0, 0, 255],
-              [255, 255, 0],
-              [0, 255, 255],
-              [255, 255, 255]
-              ]
+def mask_to_img(mask):
+    """Generate colors per class, only 3 classes are supported"""
     mask_img = np.zeros((mask.shape[0],
                          mask.shape[1], 3), dtype=np.uint8)
-    for i in range(1, num_class):
-        mask_img[mask == i] = colors[i-1]
+    mask_img[mask == 1] = [255, 255, 0]
+    mask_img[mask == 2] = [0, 255, 255]
+    mask_img[mask == 3] = [255, 0, 0]
     mask_img = Image.fromarray(mask_img)
     return mask_img
 
 
-def get_qualitatives(outputs, masks, paths, seq_name, quali_iter, signal_type=None, dataset_type=None):
+def get_qualitatives(outputs, masks, paths, seq_name, quali_iter, signal_type=None):
     """
     Method to get qualitative results
 
@@ -443,36 +310,18 @@ def get_qualitatives(outputs, masks, paths, seq_name, quali_iter, signal_type=No
     quali_iter: int
     """
     if signal_type:
-        folder_path = paths['logs'] / dataset_type / signal_type / seq_name[0]
-        mask_fpath = folder_path / 'mask'
-        output_fpath = folder_path / 'output'
+        folder_path = paths['logs'] / signal_type / seq_name[0]
     else:
-        folder_path = paths['logs'] / dataset_type / seq_name[0]
-        mask_fpath = folder_path / 'mask'
-        output_fpath = folder_path / 'output'
-    
-    if dataset_type in ['CWRdata', 'Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
-        num_class = 4
-    elif dataset_type == 'PDRdata':
-        num_class = 5
-    elif dataset_type in ['XPDdata', 'RDSyn', 'NuaaSim']:
-        num_class = 2
-    elif dataset_type == 'LSFJamming':
-        num_class = 7
-    else:
-        raise KeyError(f'Dataset {dataset_type} has not been supported yet.')
-    
-    # folder_path.mkdir(parents=True, exist_ok=True)
-    mask_fpath.mkdir(parents=True, exist_ok=True)
-    output_fpath.mkdir(parents=True, exist_ok=True)
+        folder_path = paths['logs'] / seq_name[0]
+    folder_path.mkdir(parents=True, exist_ok=True)
     outputs = torch.argmax(outputs, axis=1).cpu().numpy()
     masks = torch.argmax(masks, axis=1).cpu().numpy()
     for i in range(outputs.shape[0]):
-        mask_img = mask_to_img(masks[i], num_class)
-        mask_path = mask_fpath / 'mask_{}.png'.format(quali_iter)
+        mask_img = mask_to_img(masks[i])
+        mask_path = folder_path / 'mask_{}.png'.format(quali_iter)
         mask_img.save(mask_path)
-        output_img = mask_to_img(outputs[i], num_class)
-        output_path = output_fpath / 'output_{}.png'.format(quali_iter)
+        output_img = mask_to_img(outputs[i])
+        output_path = folder_path / 'output_{}.png'.format(quali_iter)
         output_img.save(output_path)
         quali_iter += 1
     return quali_iter
@@ -483,3 +332,141 @@ def count_params(model):
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     nb_params = sum([np.prod(p.size()) for p in model_parameters])
     return nb_params
+
+
+
+####zyc@20230605
+class CFAR():
+    def __init__(self, gb, rb, alpha=0.2):
+        self.gb = gb
+        self.rb = rb
+        self.padding = (self.gb + rb,
+                        self.gb + rb,
+                        self.gb + rb,
+                        self.gb + rb)
+        self.noise_size = (self.gb * 2 + self.rb + 1) * 4
+
+        # padding order: l-r-t-b
+        self.zero_padding = nn.ZeroPad2d(self.padding)
+
+        self.alpha = alpha
+
+
+    def forward(self, x): #b, c, t, h, w
+
+        h, w = x.shape[-2], x.shape[-1]
+        N = self.noise_size
+        dtype = x.data.type()
+        b = x.size(0)
+
+        x_ori = x.copy()
+
+        x = self.zero_padding(x)
+
+        # let p_r denote the reference point positions
+        # p_r shape: Bx2NxHxW
+        p_r = self._get_p_r(b, h, w, N, dtype)
+        # sample x_r (b, c, t, h, w, N) using p_r
+        x_noise_mean = self._sample_x(x, p_r, N)
+
+        # comparing x_ori and threthold and then denoise
+        thld = self.alpha * x_noise_mean
+        x_diff = x_ori - thld
+        x_cfar = torch.where(x_diff > 0, x_ori, 0)
+
+        return x_cfar
+
+    # getting p_c (the center point coords) from the padded grid of input x
+
+    def _get_p_c(self, b, h, w, N, dtype):
+        # generating pc_grid
+        p_c_x, p_c_y = torch.meshgrid(
+            torch.arange(self.padding[2], h * self.pc_strd + self.padding[2], self.pc_strd),
+            torch.arange(self.padding[0], w * self.pc_strd + self.padding[0], self.pc_strd))
+        p_c_x = torch.flatten(p_c_x).view(1, 1, h, w).repeat(1, N, 1, 1)
+        p_c_y = torch.flatten(p_c_y).view(1, 1, h, w).repeat(1, N, 1, 1)
+        # p_c: 1x2NxHxW
+        p_c = torch.cat([p_c_x, p_c_y], 1).type(dtype)
+        # (B, 2N, h, w)
+        p_c = p_c.repeat(b, 1, 1, 1)
+        return p_c
+
+        # generating peak receptive field grid
+
+    def _gen_prf_grid(self, rb, gb, N, dtype):
+        h_t = -(rb + gb)
+        h_d = rb + gb
+        w_l = -(rb + gb)
+        w_r = rb + gb
+        w_prf = (rb + gb) * 2 + 1
+        h_prf = (rb + gb) * 2 + 1
+        prf_x_idx, prf_y_idx = torch.meshgrid(
+            torch.arange(h_t, h_d + 1),
+            torch.arange(w_l, w_r + 1))
+        # taking positions clockwise
+        prf_xt = prf_x_idx[0:rb]
+        prf_xr = prf_x_idx[rb:(h_prf - 2 * rb + 1), (w_prf - rb):w_prf]
+        prf_xd = prf_x_idx[(h_prf - rb):h_prf]
+        prf_xl = prf_x_idx[rb:(h_prf - 2 * rb + 1), 0:rb]
+        prf_x = torch.cat([torch.flatten(prf_xt),
+                           torch.flatten(prf_xr),
+                           torch.flatten(prf_xd),
+                           torch.flatten(prf_xl)], 0)
+        prf_yt = prf_y_idx[0:rb]
+        prf_yr = prf_y_idx[rb:(h_prf - 2 * rb + 1), (w_prf - rb):w_prf]
+        prf_yd = prf_y_idx[(h_prf - rb):h_prf]
+        prf_yl = prf_y_idx[rb:(h_prf - 2 * rb + 1), 0:rb]
+        prf_y = torch.cat([torch.flatten(prf_yt),
+                           torch.flatten(prf_yr),
+                           torch.flatten(prf_yd),
+                           torch.flatten(prf_yl)], 0)
+
+        prf = torch.cat([prf_x, prf_y], 0)
+        prf = prf.view(1, 2 * N, 1, 1).type(dtype)
+        return prf
+
+        # getting p_r positions from each p_c
+
+    def _get_p_r(self, b, h, w, N, dtype):
+        rb = self.rb
+        gb = self.gb
+        # (1, 2N, 1, 1)
+        prf = self._gen_prf_grid(rb, gb, N, dtype)
+        # (B, 2N, h, w)
+        p_c = self._get_p_c(b, h, w, N, dtype)
+        # (B, 2N, h, w)
+        p_r = p_c + prf
+        return p_r
+
+    # expanding hitoric map using grid_gs
+    def _sample_x(self, x_pad, p, N):
+        # p:(b,2N,h,w)  x_pad:(b,c,t-1,h_p,w_p)
+        p = p.contiguous().permute(0, 2, 3, 1)  # (b,h,w,2n)
+        b, h, w, _ = p.size()
+        h_pad = x_pad.size(3)
+        w_pad = x_pad.size(4)
+        c = x_pad.size(1)
+        t = x_pad.size(2)
+        # (b, c, t-1, h_pad*w_pad)
+        # strech each spatial channel of x_padas 1-D vector
+        x_pad = x_pad.contiguous().view(b, c, t, -1)  # cuda0 float32
+        # (b, h_pad, w_pad, n)
+        # transform spatial coord of p into the 1-D index
+        index = p[..., :N] * w_pad + p[..., N:]  # cpu,int64
+        # index_x = torch.clamp(p[..., :N], 0, h_pad-1)
+        # index_y = torch.clamp(p[..., N:], 0, w_pad-1)
+        # index = index_x * w_pad + index_y
+        # (b, c, t-1, h*w*N)
+        index = index.contiguous().unsqueeze(dim=1).expand(-1, t, -1, -1, -1)
+        index = index.contiguous().unsqueeze(dim=1).expand(-1, c, -1, -1, -1, -1)
+        index = index.contiguous().view(b, c, t, -1)
+        index = index.long().cuda()  # cuda0 int64 [b,128,t-1,h*w*N]
+        x_r = x_pad.gather(dim=-1, index=index)
+        x_r = x_r.contiguous().view(b, c, t, h, w, N)
+        x_r = x_r.mean(dim=-1) #(b, c, t, h, w)
+        return x_r  # cuda0 float32
+
+
+
+
+

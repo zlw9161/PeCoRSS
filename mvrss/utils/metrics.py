@@ -18,7 +18,11 @@ class Evaluator:
 
     def get_pixel_prec_class(self, harmonic_mean=False):
         """Pixel Precision"""
-        prec_by_class = np.diag(self.confusion_matrix) / np.nansum(self.confusion_matrix, axis=0)
+        col_sums = np.nansum(self.confusion_matrix, axis=0)
+        prec_by_class = np.diag(self.confusion_matrix) / np.where(col_sums == 0, 1, col_sums)
+        prec_by_class[col_sums == 0] = 0  # 无预测结果的类别，精确率设为0
+
+        # = np.diag(self.confusion_matrix) / np.nansum(self.confusion_matrix, axis=0)
         prec_by_class = np.nan_to_num(prec_by_class)
         if harmonic_mean:
             prec = hmean(prec_by_class)

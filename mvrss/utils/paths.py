@@ -13,9 +13,10 @@ class Paths(Configurable):
         self._build()
 
     def _build(self):
-        self.paths['Carrada'] = Path(self.config['data']['carrada'])
+        warehouse = Path(self.config['data']['warehouse'])
+        self.paths['warehouse'] = warehouse
         self.paths['logs'] = Path(self.config['data']['logs'])
-   
+        self.paths['carrada'] = warehouse / 'Carrada'
 
     def get(self):
         return self.paths

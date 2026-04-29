@@ -2,7 +2,7 @@
 #### TFoc + vanilla + maskdraw ####
 #### ASPP: using TFoc output as input
 #### LSE: using latent features(TFoc + 1x1Conv) as input
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -478,7 +478,7 @@ class VitNet(nn.Module):
         Total numer of frames used as a sequence
     """
 
-    def __init__(self, n_classes, n_frames, zero_doppler_filter=False):
+    def __init__(self, n_classes, n_frames, signal_type, zero_doppler_filter=False):
         super().__init__()
         self.n_classes = n_classes
         self.n_frames = n_frames

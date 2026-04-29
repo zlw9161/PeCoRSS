@@ -13,9 +13,16 @@ class TensorboardMultiLossVisualizer:
     def __init__(self, writer):
         self.writer = writer
 
+    def update_train_loss(self, loss, losses, iteration):
+        self.writer.add_scalar('train_losses/global', loss,
+                               iteration)
+        self.writer.add_scalar('train_losses/CE', losses[0],
+                               iteration)
+        self.writer.add_scalar('train_losses/Dice', losses[1],
+                               iteration)
 
     def update_multi_train_loss(self, global_loss, rd_loss, rd_losses, ra_loss, ra_losses,
-                                iteration, coherence_loss=None, track_loss=None):
+                                iteration, coherence_loss=None):
         self.writer.add_scalar('train_losses/global', global_loss,
                                iteration)
         self.writer.add_scalar('train_losses/range_doppler/global', rd_loss,
@@ -33,8 +40,27 @@ class TensorboardMultiLossVisualizer:
         if coherence_loss:
             self.writer.add_scalar('train_losses/Coherence', coherence_loss,
                                    iteration)
-        if track_loss:
-            self.writer.add_scalar('train_losses/Track_loss', track_loss,
+
+    def update_multi_train_raloss(self, global_loss, ra_loss, ra_losses,
+                                iteration):
+        self.writer.add_scalar('train_losses/global', global_loss,
+                                   iteration)
+        self.writer.add_scalar('train_losses/range_angle/global', ra_loss,
+                                   iteration)
+        self.writer.add_scalar('train_losses/range_angle/CE', ra_losses[0],
+                                   iteration)
+        self.writer.add_scalar('train_losses/range_angle/Dice', ra_losses[1],
+                                   iteration)
+
+    def update_multi_train_rdloss(self, global_loss, rd_loss, rd_losses,
+                                iteration):
+        self.writer.add_scalar('train_losses/global', global_loss,
+                                   iteration)
+        self.writer.add_scalar('train_losses/range_dopper/global', rd_loss,
+                                   iteration)
+        self.writer.add_scalar('train_losses/range_dopper/CE', rd_losses[0],
+                                   iteration)
+        self.writer.add_scalar('train_losses/range_dopper/Dice', rd_losses[1],
                                    iteration)
 
 
@@ -152,10 +178,6 @@ class TensorboardMultiLossVisualizer:
             self.writer.add_scalar('validation_losses/Coherence', metrics['coherence_loss'],
                                    iteration)
 
-        if 'track_loss' in metrics.keys():
-            self.writer.add_scalar('validation_losses/Track_loss', metrics['track_loss'],
-                                   iteration)
-
         self.writer.add_scalar('Range_Doppler_metrics/PixelAccuracy',
                                metrics['range_doppler']['acc'],
                                iteration)
@@ -188,8 +210,96 @@ class TensorboardMultiLossVisualizer:
                                metrics['range_angle']['dice'],
                                iteration)
 
+    def update_multi_rd_val_metrics(self, metrics, iteration):
+        self.writer.add_scalar('validation_losses/global',
+                               (1/2)*(metrics['range_doppler']['loss']+metrics['range_angle']['loss']),
+                               iteration)
+        self.writer.add_scalar('validation_losses/range_doppler/global',
+                               metrics['range_doppler']['loss'], iteration)
+        self.writer.add_scalar('validation_losses/range_doppler/CE',
+                               metrics['range_doppler']['loss_ce'], iteration)
+        self.writer.add_scalar('validation_losses/range_doppler/Dice',
+                               metrics['range_doppler']['loss_dice'], iteration)
 
 
+        if 'coherence_loss' in metrics.keys():
+            self.writer.add_scalar('validation_losses/Coherence', metrics['coherence_loss'],
+                                   iteration)
+
+        self.writer.add_scalar('Range_Doppler_metrics/PixelAccuracy',
+                               metrics['range_doppler']['acc'],
+                               iteration)
+        self.writer.add_scalar('Range_Doppler_metrics/PixelPrecision',
+                               metrics['range_doppler']['prec'],
+                               iteration)
+        self.writer.add_scalar('Range_Doppler_metrics/PixelRecall',
+                               metrics['range_doppler']['recall'],
+                               iteration)
+        self.writer.add_scalar('Range_Doppler_metrics/MIoU',
+                               metrics['range_doppler']['miou'],
+                               iteration)
+        self.writer.add_scalar('Range_Doppler_metrics/Dice',
+                               metrics['range_doppler']['dice'],
+                               iteration)
+
+
+    def update_multi_ra_val_metrics(self, metrics, iteration):
+
+        self.writer.add_scalar('validation_losses/range_angle/global',
+                               metrics['range_angle']['loss'], iteration)
+        self.writer.add_scalar('validation_losses/range_angle/CE',
+                               metrics['range_angle']['loss_ce'], iteration)
+        self.writer.add_scalar('validation_losses/range_angle/Dice',
+                               metrics['range_angle']['loss_dice'], iteration)
+
+        if 'coherence_loss' in metrics.keys():
+            self.writer.add_scalar('validation_losses/Coherence', metrics['coherence_loss'],
+                                   iteration)
+
+        self.writer.add_scalar('Range_angle_metrics/PixelAccuracy',
+                               metrics['range_angle']['acc'],
+                               iteration)
+        self.writer.add_scalar('Range_angle_metrics/PixelPrecision',
+                               metrics['range_angle']['prec'],
+                               iteration)
+        self.writer.add_scalar('Range_angle_metrics/PixelRecall',
+                               metrics['range_angle']['recall'],
+                               iteration)
+        self.writer.add_scalar('Range_angle_metrics/MIoU',
+                               metrics['range_angle']['miou'],
+                               iteration)
+        self.writer.add_scalar('Range_angle_metrics/Dice',
+                               metrics['range_angle']['dice'],
+                               iteration)
+
+    def update_multi_rd_val_metrics(self, metrics, iteration):
+
+        self.writer.add_scalar('validation_losses/range_doppler/global',
+                               metrics['range_doppler']['loss'], iteration)
+        self.writer.add_scalar('validation_losses/range_doppler/CE',
+                               metrics['range_doppler']['loss_ce'], iteration)
+        self.writer.add_scalar('validation_losses/range_doppler/Dice',
+                               metrics['range_doppler']['loss_dice'], iteration)
+
+        if 'coherence_loss' in metrics.keys():
+            self.writer.add_scalar('validation_losses/Coherence', metrics['coherence_loss'],
+                                   iteration)
+
+        self.writer.add_scalar('Range_doppler_metrics/PixelAccuracy',
+                               metrics['range_doppler']['acc'],
+                               iteration)
+        self.writer.add_scalar('Range_doppler_metrics/PixelPrecision',
+                               metrics['range_doppler']['prec'],
+                               iteration)
+        self.writer.add_scalar('Range_doppler_metrics/PixelRecall',
+                               metrics['range_doppler']['recall'],
+                               iteration)
+        self.writer.add_scalar('Range_doppler_metrics/MIoU',
+                               metrics['range_doppler']['miou'],
+                               iteration)
+        self.writer.add_scalar('Range_doppler_metrics/Dice',
+                               metrics['range_doppler']['dice'],
+                               iteration)
 
     def update_detection_val_metrics(self, metrics, iteration):
         self.writer.add_scalar('AveragePrecision/Mean', metrics['map'],
@@ -204,52 +314,6 @@ class TensorboardMultiLossVisualizer:
                                metrics['map_by_class']['car'],
                                iteration)
 
-    def update_multi_test_metrics(self, metrics, iteration):
-        self.writer.add_scalar('test_losses/global',
-                               (1 / 2) * (metrics['range_doppler']['loss'] + metrics['range_angle']['loss']),
-                               iteration)
-        self.writer.add_scalar('test_losses/range_doppler/global',
-                               metrics['range_doppler']['loss'], iteration)
-        self.writer.add_scalar('test_losses/range_doppler/CE',
-                               metrics['range_doppler']['loss_ce'], iteration)
-        self.writer.add_scalar('test_losses/range_doppler/Dice',
-                               metrics['range_doppler']['loss_dice'], iteration)
-
-        self.writer.add_scalar('test_losses/range_angle/global',
-                               metrics['range_angle']['loss'], iteration)
-        self.writer.add_scalar('test_losses/range_angle/CE',
-                               metrics['range_angle']['loss_ce'], iteration)
-        self.writer.add_scalar('test_losses/range_angle/Dice',
-                               metrics['range_angle']['loss_dice'], iteration)
-        if 'coherence_loss' in metrics.keys():
-            self.writer.add_scalar('test_losses/Coherence', metrics['coherence_loss'],
-                                   iteration)
-        if 'track_loss' in metrics.keys():
-            self.writer.add_scalar('test_losses/Track_loss', metrics['track_loss'],
-                                   iteration)
-
-        self.writer.add_scalar('Test/Range_Doppler_metrics/PixelAccuracy',
-                               metrics['range_doppler']['acc'],
-                               iteration)
-        self.writer.add_scalar('Test/Range_Doppler_metrics/PixelPrecision',
-                               metrics['range_doppler']['prec'],
-                               iteration)
-        self.writer.add_scalar('Test/Range_Doppler_metrics/PixelRecall',
-                               metrics['range_doppler']['recall'],
-                               iteration)
-        self.writer.add_scalar('Test/Range_Doppler_metrics/MIoU',
-                               metrics['range_doppler']['miou'],
-                               iteration)
-        self.writer.add_scalar('Test/Range_Doppler_metrics/Dice',
-                               metrics['range_doppler']['dice'],
-                               iteration)
-
-    def model_visualization(self, network, data_sample):
-        try:
-            self.writer.add_graph(network, (data_sample, ))
-        except:
-            print("Warning: Model Visualization Failed!!!")
-    
     def update_img_masks(self, pred_grid, gt_grid, iteration):
         self.writer.add_image('Predicted_masks', pred_grid, iteration)
         self.writer.add_image('Ground_truth_masks', gt_grid, iteration)

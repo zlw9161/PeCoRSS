@@ -9,17 +9,72 @@ import scipy.stats
 
 from mvrss.utils import MVRSS_HOME
 from mvrss.losses.soft_dice import SoftDiceLoss
-from mvrss.losses.soft_dice_v2 import SoftDiceLossV2
 from mvrss.losses.coherence import CoherenceLoss
 from mvrss.losses.soft_coherence import SoftCoherenceLoss
 from mvrss.losses.sparse_coherence import SparseCoherenceLoss
 from mvrss.losses.smospa_coherence import SmoSpaCoherenceLoss
-from mvrss.losses.focal_loss import FocalLoss
 from mvrss.losses.distribution_coherence import DistributionCoherenceLoss
 from mvrss.losses.denoise_coherence import DenoiseCoherenceLoss
 from mvrss.loaders.dataloaders_F import Rescale, Flip, HFlip, VFlip
 from torch.utils.data import DataLoader
 from mvrss.loaders.dataloaders_F import CarradaDataset
+
+
+def build_track_heatmap(mask_seq: torch.Tensor, gamma: float = 0.9, use_history: bool = True) -> torch.Tensor:
+    """
+    Build a per-class track heatmap target from a sequence of one-hot masks.
+
+    This is designed for "track deviation" supervision: rather than classifying a
+    union-of-masks, we regress a *soft* heatmap that emphasizes recent positions.
+
+    Parameters
+    ----------
+    mask_seq: torch.Tensor
+        Shape (B, C, T, H, W), typically C=4 classes (including background).
+        Expected values are 0/1 one-hot per frame (or soft values in [0,1]).
+    gamma: float
+        Temporal decay factor in (0,1]. Newer frames receive higher weights.
+        Weight for time index t is gamma**(K-1-t) where t in [0, K-1].
+    use_history: bool
+        If True, uses frames [0..T-2] as history to supervise target at T-1.
+        If False, uses all frames [0..T-1].
+
+    Returns
+    -------
+    track_gt: torch.Tensor
+        Shape (B, C, H, W) with values in [0,1].
+        Background is computed as 1 - max(foreground) to keep it consistent.
+    """
+    if mask_seq.dim() != 5:
+        raise ValueError(f"mask_seq must be 5D (B,C,T,H,W), got shape {tuple(mask_seq.shape)}")
+
+    b, c, t, h, w = mask_seq.shape
+    if t < 2 and use_history:
+        raise ValueError("Need at least 2 frames to build history track heatmap.")
+
+    k = int(t - 1 if use_history else t)
+    masks = mask_seq[:, :, :k, :, :].float()
+
+    # Temporal weights: older -> smaller, newer -> larger
+    device = masks.device
+    # Avoid Python list -> CUDA tensor construction (can be slow / fragment memory).
+    # Exponents: [k-1, k-2, ..., 0]
+    exponents = torch.arange(k - 1, -1, -1, device=device, dtype=masks.dtype)
+    gamma_t = torch.tensor(float(gamma), device=device, dtype=masks.dtype)
+    weights = torch.pow(gamma_t, exponents)  # (k,)
+    weights = weights / (weights.sum() + 1e-8)
+    weights = weights.view(1, 1, k, 1, 1)
+
+    heat = torch.sum(masks * weights, dim=2)  # (B,C,H,W)
+    heat = torch.clamp(heat, 0.0, 1.0)
+
+    # Recompute background to avoid ambiguous mixtures in one-hot inputs.
+    if c >= 2:
+        fg = heat[:, 1:, :, :]
+        bg = 1.0 - torch.max(fg, dim=1, keepdim=True).values
+        heat = torch.cat([torch.clamp(bg, 0.0, 1.0), fg], dim=1)
+
+    return heat
 
 
 def get_class_weights(signal_type):
@@ -35,9 +90,9 @@ def get_class_weights(signal_type):
     weights: numpy array
     """
     weight_path = MVRSS_HOME / 'config_files'
-    if signal_type in ('range_angle'):
+    if signal_type == 'range_angle':
         file_name = 'ra_weights.json'
-    elif signal_type in ('range_doppler'):
+    elif signal_type == 'range_doppler':
         file_name = 'rd_weights.json'
     else:
         raise ValueError('Signal type {} is not supported.'.format(signal_type))
@@ -61,9 +116,9 @@ def get_loss_weight(signal_type):
     -------
     weight: numpy float
     """
-    if signal_type in ('range_angle'):
+    if signal_type == 'range_angle':
         weight = 2.0
-    elif signal_type in ('range_doppler'):
+    elif signal_type == 'range_doppler':
         weight = 1.0
     else:
         raise ValueError('Signal type {} is not supported.'.format(signal_type))
@@ -135,7 +190,7 @@ def normalize(data, signal_type, norm_type='local'):
     norm_data: numpy array
         normalised radar view
     """
-    if norm_type in ('local'):
+    if norm_type == 'local':
         min_value = torch.min(data)
         max_value = torch.max(data)
         norm_data = torch.div(torch.sub(data, min_value), torch.sub(max_value, min_value))
@@ -192,51 +247,26 @@ def define_loss(signal_type, custom_loss, device, view_weight):
         Short name of the custom loss to use
         Supported: 'wce', 'sdice', 'wce_w10sdice' or 'wce_w10sdice_w5col'
         Default: Cross Entropy is used for any other str
-    devide: str
-        Supported: 'cuda' or 'cpu'
+    view_weight: float
+        SoftDice ``global_weight`` for ``wce_w10sdice`` / ``wce_w10sdice_w5col`` (per view).
+        Use ``10.0`` for both RD and RA to match the old fixed dice scale.
     """
-    if custom_loss == 'ce':
-        loss = [nn.CrossEntropyLoss(), lambda x, y: torch.tensor(0., device=x.device)]
-    elif custom_loss == 'wce':
+    if custom_loss == 'wce':
         weights = get_class_weights(signal_type)
-        loss = [nn.CrossEntropyLoss(weight=weights.to(device).float()), lambda x, y: torch.tensor(0., device=x.device)]
+        loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
     elif custom_loss == 'sdice':
-        loss = [SoftDiceLoss(), lambda x, y: torch.tensor(0., device=x.device)]
-    elif custom_loss == 'focal':
-        loss = [FocalLoss(weight=None), lambda x, y: torch.tensor(0., device=x.device)]
+        loss = SoftDiceLoss()
     elif custom_loss == 'wce_w10sdice':
         weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
-        loss = [ce_loss, SoftDiceLoss(global_weight=10.)]
+        sdice_w = float(view_weight) if view_weight is not None else 10.0
+        loss = [ce_loss, SoftDiceLoss(global_weight=sdice_w)]
     elif custom_loss == 'wce_w10sdice_w5col':
         weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
-        #MSE_loss = nn.MSELoss()
-        #loss = [ce_loss, SoftDiceLoss(global_weight=view_weight), MSE_loss, CoherenceLoss(global_weight=5.)]
-        loss = [ce_loss, SoftDiceLoss(global_weight=view_weight), CoherenceLoss(global_weight=5.)]
-        #focal
-    elif custom_loss == 'w20focal_w10sdice_w5col':
-        weights = get_class_weights(signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=20.)
-        loss = [focal_loss, SoftDiceLoss(global_weight=10.), CoherenceLoss(global_weight=5.)]
-    elif custom_loss == 'wfocal_w10sdice_w5col':
-        weights = get_class_weights( signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=1.)
-        loss = [focal_loss, SoftDiceLoss(global_weight=10.), CoherenceLoss(global_weight=5.)]
-        # lt @20230412
-    elif custom_loss == 'wfocal_w10sdicev2_w5col':
-        weights = get_class_weights( signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float())
-        loss = [focal_loss, SoftDiceLossV2(global_weight=10.), CoherenceLoss(global_weight=5.)]
-        # lt @20230416
-    elif custom_loss == 'w20focal_wesub2sdicev2_w5col':
-        weights = get_class_weights( signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=20.)
-        loss = [focal_loss, SoftDiceLossV2(global_weight=1e-2), CoherenceLoss(global_weight=5.)]
-    elif custom_loss == 'w20focal_wesub1sdicev2_w5col':
-        weights = get_class_weights(signal_type)
-        focal_loss = FocalLoss(weight=weights.to(device).float(), global_weight=20.)
-        loss = [focal_loss, SoftDiceLossV2(global_weight=1e-1), CoherenceLoss(global_weight=5.)]
+        MSE_loss = nn.MSELoss()
+        sdice_w = float(view_weight) if view_weight is not None else 10.0
+        loss = [ce_loss, SoftDiceLoss(global_weight=sdice_w), MSE_loss, CoherenceLoss(global_weight=5.)]
     # zlw@20220302
     elif custom_loss == 'wce_w10sdice_w5col_sig_blnc':
         weights = get_class_weights(signal_type)

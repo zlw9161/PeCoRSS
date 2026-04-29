@@ -4,10 +4,14 @@ import pickle
 import time
 import errno
 import os
-
+import argparse
 import torch
 import torch.distributed as dist
 
+# os.environ['MASTER_ADDR'] = '192.168.8.119'
+# os.environ['MASTER_PORT'] = '4164'
+# os.environ['RANK'] = '0'
+# os.environ['WORLD_SIZE'] = '2'
 
 # def all_gather(data):
 #     """
@@ -168,7 +172,10 @@ def save_on_master(*args, **kwargs):
 
 def init_distributed_mode(args):
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+        #os.environ['MASTER_ADDR'] = '192.168.8.119'
+        # print(os.environ['MASTER_ADDR'])
         args.rank = int(os.environ["RANK"])
+        # args.rank = 1
         args.world_size = int(os.environ['WORLD_SIZE'])
         args.gpu = int(os.environ['LOCAL_RANK'])
     elif 'SLURM_PROCID' in os.environ:
@@ -182,12 +189,25 @@ def init_distributed_mode(args):
     args.distributed = True
 
     torch.cuda.set_device(args.gpu)
-    args.dist_backend = 'nccl'
+    args.dist_backend = 'gloo'
     print('| distributed init (rank {}): {}'.format(
         args.rank, args.dist_url), flush=True)
     torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                          world_size=args.world_size, rank=args.rank)
+    # torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
+    #                                      world_size=2, rank=0)
     # 使用torch1.9或以上时建议加上device_ids=[args.rank]
     torch.distributed.barrier()
     # 仅让主进程进行print
     setup_for_distributed(args.rank == 0)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--cfg', help='Path to config file.', default='config.json')
+    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
+    parser.add_argument("--sync-bn", dest="sync_bn", help="Use sync batch norm", action='store_true')
+    args = parser.parse_args()
+    #print(os.environ['LOCAL_RANK'])
+
+    init_distributed_mode(args)

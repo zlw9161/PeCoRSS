@@ -24,8 +24,7 @@ class CoherenceLoss(nn.Module):
         ra_softmax = nn.Softmax(dim=1)(ra_input)
         rd_range_probs = torch.max(rd_softmax, dim=3, keepdim=True)[0]
         # Rotate RD Range vect to match zero range
-        # lt @20230406 初始时进行了对齐，则此处无需再对齐
-        # rd_range_probs = torch.rot90(rd_range_probs, 2, [2, 3])
+        rd_range_probs = torch.rot90(rd_range_probs, 2, [2, 3])
         ra_range_probs = torch.max(ra_softmax, dim=3, keepdim=True)[0]
         coherence_loss = self.mse(rd_range_probs, ra_range_probs)
         weighted_coherence_loss = self.global_weight*coherence_loss

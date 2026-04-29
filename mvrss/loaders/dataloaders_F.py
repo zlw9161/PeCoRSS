@@ -50,21 +50,17 @@ class CarradaDataset(Dataset):
         Default: False
     """
 
-    def __init__(self, dataset, dataset_type, annotation_type, path_to_frames, process_signal,
+    def __init__(self, dataset, annotation_type, path_to_frames, process_signal,
                  n_frames, transformations=None, add_temp=False, Mulmask=False):
         self.dataset = dataset
-        self.dataset_type = dataset_type
         self.annotation_type = annotation_type
         self.path_to_frames = Path(path_to_frames)
-        if self.dataset_type == 'CarradaRAC':
-            self.path_to_annots = self.path_to_frames / 'new_annotations' / self.annotation_type
-        else:
-            self.path_to_annots = self.path_to_frames / 'annotations' / self.annotation_type
         self.process_signal = process_signal
         self.n_frames = n_frames
         self.transformations = transformations
         self.add_temp = add_temp
         self.dataset = self.dataset[self.n_frames - 1:]  # remove n first frames
+        self.path_to_annots = self.path_to_frames / 'annotations' / self.annotation_type
         self.mulmask = Mulmask
 
     def transform(self, frame, is_vflip=False, is_hflip=False):

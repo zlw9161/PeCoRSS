@@ -2,12 +2,14 @@
 #### TFoc + vanilla + maskdraw ####
 #### ASPP: using TFoc output as input
 #### LSE: using latent features(TFoc + 1x1Conv) as input
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
 import os
+
+os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
 
 class DoubleConvBlock(nn.Module):
     """ (2D conv => BN => LeakyReLU) * 2 """
@@ -18,9 +20,11 @@ class DoubleConvBlock(nn.Module):
             nn.Conv2d(in_ch, out_ch, kernel_size=k_size, padding=pad, dilation=dil),
             nn.BatchNorm2d(out_ch),
             nn.LeakyReLU(inplace=True),
+
             nn.Conv2d(out_ch, out_ch, kernel_size=k_size, padding=pad, dilation=dil),
             nn.BatchNorm2d(out_ch),
             nn.LeakyReLU(inplace=True)
+
         )
 
     def forward(self, x):
@@ -37,6 +41,7 @@ class ConvBlock(nn.Module):
             nn.Conv2d(in_ch, out_ch, kernel_size=k_size, padding=pad, dilation=dil),
             nn.BatchNorm2d(out_ch),
             nn.LeakyReLU(inplace=True)
+
         )
 
     def forward(self, x):
@@ -53,7 +58,8 @@ class TREBlock(nn.Module):
         self.block = nn.Sequential(
             nn.Conv3d(in_ch, out_ch, kernel_size=k_size, stride=strd, padding=pad),
             nn.BatchNorm3d(out_ch),
-            nn.LeakyReLU(inplace=True))
+            nn.LeakyReLU(inplace=True)
+           )
 
     def forward(self, x):
         x = self.block(x)
@@ -69,9 +75,11 @@ class Double3DConvBlock(nn.Module):
             nn.Conv3d(in_ch, out_ch*btnk_sc, kernel_size=k_size, stride=strd, padding=pad),
             nn.BatchNorm3d(out_ch*btnk_sc),
             nn.LeakyReLU(inplace=True),
+
             nn.Conv3d(out_ch*btnk_sc, out_ch, kernel_size=k_size, stride=strd, padding=pad),
             nn.BatchNorm3d(out_ch),
             nn.LeakyReLU(inplace=True)
+
         )
 
     def forward(self, x):
@@ -162,39 +170,30 @@ class TFocConv(nn.Module):
         p_tgt, p_tgt_pos = self._get_grid_center(b, h, w, n, dtype)  # cpu int64
         # 4 sample center points in target map x_tgt (b, c, t-1, h, w, N) using p_tgt
         x_tgt = self._sample_x(x_tgt, p_tgt, n)  # (b,c,t-1,h,w,n)
+
         # 5 generate search point in history maps  coordinates
         p_hst = self._gen_global_sample_grid(b, h, w, n, dtype)  # (b,2n,h,w) cpu int64
         # 6 sample search point  in history maps x_hst(b, c, t-1,h, w, N) using p_hst
         x_hst = self._sample_x(x_hst, p_hst, n)  # (b,c,t-1,h,w,n) #cuda0 florat32
-        # 7 computing distance matrix
-        
 
+        # 7 computing distance matrix
+        # track_loss
         x_seq = torch.cat((x_hst, x_tgt), dim=1)  # (b,2c,t-1,h,w,n)
         x_seq = self.inner_predict(x_seq.view(b, 2*c, t - 1, h*w, n))  # (b,4,t-1,h*w,n)
-        x_seq  = self.softmax(x_seq) # (b,4,t-1,h*w,n)
+        x_seq = self.softmax(x_seq) # (b,4,t-1,h*w,n)
 
         # prepare for ce loss
-        x_nbr = self.probpooling(x_seq).squeeze(dim=-1)  # (b,4,t-1,h*w)
-        probs = torch.prod(x_nbr.view(b, 4, t - 1, h, w), dim=2)  # (b,4,h,w)
+        probs = torch.prod(self.probpooling(x_seq).squeeze(dim=-1).view(b, 4, t - 1, h, w), dim=2)  # (b,4,h,w)
+
 
         # mask-draw
         _, x_clas_index = torch.max(x_seq, dim=1) #(b,t-1,h*w,n)
         # calculate the number of each value on n dimention
-        x_tem = x_clas_index.reshape(-1) #(b*(t-1)*h*w*n)
-        x_tem_onehot = F.one_hot(x_tem, num_classes=4)#(b*(t-1)*h*w*n,4)
+        x_tem_onehot = F.one_hot( x_clas_index.reshape(-1), num_classes=4)#(b*(t-1)*h*w*n,4)
         x_tem_onehot = x_tem_onehot.reshape(-1, n, 4) #(b*(t-1)*h*w,n,4)
         x_tem_onehot = torch.sum(x_tem_onehot, dim=1) #(b*(t-1)*h*w,4)
         _, x_clas_index = torch.max(x_tem_onehot, dim=1) #(b*(t-1)*h*w)
 
-
-        # x_tem_classdiff = torch.sum(torch.abs(x_tem - 0),dim=1).unsqueeze(dim=1)
-        # x_tem_classdiff = torch.cat((x_tem_classdiff, torch.sum(torch.abs(x_tem - 1),dim=1).unsqueeze(dim=1)), dim=1)
-        # x_tem_classdiff = torch.cat((x_tem_classdiff, torch.sum(torch.abs(x_tem - 2), dim=1).unsqueeze(dim=1)), dim=1)
-        # x_tem_classdiff = torch.cat((x_tem_classdiff, torch.sum(torch.abs(x_tem - 3), dim=1).unsqueeze(dim=1)), dim=1)#(b*(t-1)*h*w,4)
-        # _, x_tem_class_index = torch.min(x_tem_classdiff,dim=1) #(b*(t-1)*h*w,1)
-        t1 = x_clas_index.shape[0]/b/(h*w)
-        if t1 <= 3:
-            print("the number of frame is error")
         x_clas_index = x_clas_index.reshape(b,t-1,h*w,1).repeat(1,1,1,n).unsqueeze(dim=1) #(b,1,(t-1),h*w,n)
         x_clas_val = torch.gather(x_seq, dim=1, index=x_clas_index).squeeze(dim=1) #(b,(t-1),h*w,n)
 
@@ -240,22 +239,26 @@ class TFocConv(nn.Module):
 
         # 10 similarity
         val_resample, index_resample = torch.topk(x_clas_val, k=self.topk, dim=3, largest=False, sorted=True)  # (b,t-1,h*w,8)
-        index_resample,_ = torch.sort(index_resample,dim=-1,descending=False,stable=True)
-        val_resample[val_resample>0] = 1
+        index_resample, _ = torch.sort(index_resample, dim=-1, descending=False, stable=True)
+        val_resample[val_resample > 0] = 1
         index_resample = val_resample * index_resample
+
         unsample_flag = ((n-1)/2) * torch.ones(index_resample.shape)
         index_resample = torch.where(index_resample==0, unsample_flag.long().cuda(), index_resample.long())
+
         # index_resample = torch.argmin(mat_dist, dim=3) #(b,t-1,h*w)
         location_reference = torch.arange(0, index_resample.size(-2), 1) * n  # (h*w)
         location_reference = location_reference.unsqueeze(dim=-1).repeat(1, self.topk)  # (h*w,8)
         location_reference = location_reference.unsqueeze(dim=0).repeat(t - 1, 1, 1)  # (t-1, h*w, 8)
         location_reference = location_reference.unsqueeze(dim=0).repeat(b, 1, 1, 1)  # (b, t-1, h*w, 8)
         index_resample = index_resample + location_reference.cuda()  # (b,t-1,h*w, 8)
+
         index_resample= index_resample.contiguous().view(b, t-1, -1) #(b,t-1,h*w*8)
         index_resample = index_resample.contiguous().unsqueeze(dim=2).repeat(1, 1, c, 1)  # (b,t-1,c,h*w*8)
 
         # 11 topk sampling
         x_resample = torch.gather(x_hst.contiguous().view(b, t-1, c, -1), dim=-1, index=index_resample.long())
+
         x_resample = x_resample.contiguous().view(b, t-1, c, h, w, self.topk)  # (b,t-1,c,h,w,8)
         x_resample = x_resample.permute(0, 2, 1, 3, 4, 5)  # (b,c,t-1,h,w,8)
 
@@ -264,11 +267,11 @@ class TFocConv(nn.Module):
                                dim=-1) #(b,c,t-1,h,w,9)
         x_resample = x_resample.contiguous().view(b, c, t-1, h*w, -1) #(b,c,(t-1),h*w,9)
         x_tfoc = self.tfoc_conv(x_resample).squeeze(dim=-1) #(b,c,t-1,h*w,1)-->(b,c,t-1,h*w)
+
         x_tfoc = x_tfoc.view(b,-1,t-1,h,w)
         x_tfoc = torch.cat((x_tfoc, x_tgt_ori), dim= 2) #(b,c,t,h,w)
-
-        x_tfc = self.temporal_conv(x_tfoc) # [b, c, t-4, h, w]
-        return x_tfc, probs
+        x_tfoc = self.temporal_conv(x_tfoc) # [b, c, t-4, h, w]
+        return x_tfoc, probs
 
     # getting center grid from the padded grid of input x_tgt
     def _get_grid_center(self, b, h, w, n, dtype):
@@ -358,7 +361,7 @@ class EncodingBranch(nn.Module):
         self.tfoc_conv_block = TFocConv(in_ch=64,
                                         out_ch=128,
                                         btnk_ch=8, #out_ch/btnk_sc
-                                        search_size=7,
+                                        search_size=5,
                                         topk=8)
         self.doppler_max_pool = nn.MaxPool2d(2, stride=(2, 1))
         self.max_pool = nn.MaxPool2d(2, stride=2)
@@ -425,7 +428,7 @@ class TFocNet(nn.Module):
         Total numer of frames used as a sequence
     """
 
-    def __init__(self, n_classes, n_frames, zero_doppler_filter=True):
+    def __init__(self, n_classes, n_frames, signal_type, zero_doppler_filter=True):
         super().__init__()
         self.n_classes = n_classes
         self.n_frames = n_frames
