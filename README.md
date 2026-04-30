@@ -1,5 +1,6 @@
 <div align="center">
 
+![pecolab-logo](./images/peco-logo-banner-yellow.png)
 # 🎯 PeCoRSS: Awesome Radar Semantic Segmentation Library
 
 **Developed by PeCoLab of ISTA@CASIC**
