@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR, ExponentialLR
 from torch.utils.data import DataLoader
@@ -15,7 +16,15 @@ from torch.utils.tensorboard import SummaryWriter
 
 from svrss.learners.tester_sv import TesterSV
 from svrss.loaders.dataloaders_sv import PeCoRSVDataset
-from svrss.utils.functions import define_loss, get_transformations, normalize
+from svrss.utils.functions import (
+    define_loss,
+    build_track_heatmap,
+    get_transformations,
+    normalize,
+    resolve_class_weights_dir,
+    resolve_tvt_stats_json_path,
+    resolved_class_weights_json_path,
+)
 from svrss.utils.tensorboard_visualizer import TensorboardMultiLossVisualizer
 
 
@@ -56,6 +65,10 @@ class ModelDDP(nn.Module):
         self.is_shuffled = self.cfg["shuffle"]
         self.num_workers = self.cfg.get("num_workers", 2)
         self.cmplx_flag = self.cfg.get("cmplx_flag", False)
+        self.mulmask = bool(self.cfg.get("mulmask", False))
+        self.track_gamma = float(self.cfg.get("track_gamma", 0.9))
+        self.track_weight = float(self.cfg.get("track_weight", 0.5))
+        self.tgt = int(self.cfg.get("tgt", -1))
 
         self.rank = rank
         self.world_size = world_size
@@ -70,6 +83,12 @@ class ModelDDP(nn.Module):
         self.results = dict()
         self._resume_ckpt_path = self._resolve_resume_checkpoint()
         self._debug_first_batch_printed = False
+        model_for_set = self._model_ref()
+        if hasattr(model_for_set, "set_tgt_index"):
+            try:
+                model_for_set.set_tgt_index(self.tgt)
+            except Exception:
+                pass
 
     def _resolve_resume_checkpoint(self):
         """Map cfg['resume'] / optional cfg['checkpoint_path'] to a checkpoint file."""
@@ -139,6 +158,19 @@ class ModelDDP(nn.Module):
             f"model_ddp_sv: unsupported cfg['dataset']={self.cfg.get('dataset')!r} for path resolution."
         )
 
+    @staticmethod
+    def _resolve_tgt_index(t: int, tgt_index: int) -> int:
+        if t <= 0:
+            return 0
+        idx = int(tgt_index)
+        if idx < 0:
+            idx = t + idx
+        if idx < 0:
+            idx = 0
+        if idx > t - 1:
+            idx = t - 1
+        return idx
+
     def train(self, add_temp=False):
         start_epoch = 0
         if self.is_main_process:
@@ -152,11 +184,41 @@ class ModelDDP(nn.Module):
         if not self._resume_ckpt_path:
             self.net.apply(self._init_weights)
 
-        criterion = define_loss(self.signal_type, self.custom_loss, self.device)
+        _w_dir = resolve_class_weights_dir(self.cfg, self.paths)
+        _tvt_stats = resolve_tvt_stats_json_path(
+            self.signal_type, self.cfg, self.paths
+        )
+        if self.is_main_process:
+            cl = self.custom_loss
+            if cl == "wce" or (isinstance(cl, str) and cl.startswith("wce_")):
+                print(
+                    "[svrss] class weights JSON:",
+                    resolved_class_weights_json_path(
+                        self.signal_type, self.cfg, self.paths
+                    ),
+                    flush=True,
+                )
+            if self.norm_type == "tvt" and _tvt_stats is not None:
+                print(
+                    "[svrss] tvt norm stats JSON:",
+                    _tvt_stats.resolve(),
+                    flush=True,
+                )
+        criterion = define_loss(
+            self.signal_type,
+            self.custom_loss,
+            self.device,
+            weights_dir=_w_dir,
+            cfg=self.cfg,
+        )
+        # define_loss may return a single Module (e.g. wce, sdice) or a list (compound losses).
+        if not isinstance(criterion, (list, tuple)):
+            criterion = [criterion]
         nb_losses = len(criterion)
         running_losses = []
         running_ce_losses = []
         running_dice_losses = []
+        running_track_losses = []
         optimizer = optim.Adam(self.net.parameters(), lr=self.lr)
 
         if self.schedular_type == "exp":
@@ -194,13 +256,12 @@ class ModelDDP(nn.Module):
                 except Exception:
                     pass
             if self.is_main_process:
-                print(
-                    "=> Loaded checkpoint from {}".format(self._resume_ckpt_path)
-                )
+                print(f"=> Loaded checkpoint at epoch {checkpoint['epoch']}", flush=True)
                 print(
                     "=> Resume at epoch {} iter {} w/ best_dice {})".format(
                         start_epoch, iteration, best_test_dice
-                    )
+                    ),
+                    flush=True,
                 )
 
         for epoch in range(start_epoch, self.nb_epochs):
@@ -226,6 +287,7 @@ class ModelDDP(nn.Module):
                     self.cmplx_flag,
                     transformations,
                     add_temp,
+                    self.mulmask,
                 )
 
                 frame_dataloader = DataLoader(
@@ -240,13 +302,19 @@ class ModelDDP(nn.Module):
                         sv_data = frame["rd_matrix"].to(self.device).float()
                         sv_mask = frame["rd_mask"].to(self.device).float()
                         sv_data = normalize(
-                            sv_data, "range_doppler", norm_type=self.norm_type
+                            sv_data,
+                            "range_doppler",
+                            norm_type=self.norm_type,
+                            stats_json_path=_tvt_stats,
                         )
                     elif self.signal_type in "range_angle":
                         sv_data = frame["ra_matrix"].to(self.device).float()
                         sv_mask = frame["ra_mask"].to(self.device).float()
                         sv_data = normalize(
-                            sv_data, "range_angle", norm_type=self.norm_type
+                            sv_data,
+                            "range_angle",
+                            norm_type=self.norm_type,
+                            stats_json_path=_tvt_stats,
                         )
                     else:
                         raise ValueError("Unsupported signal_type: {}".format(self.signal_type))
@@ -270,49 +338,62 @@ class ModelDDP(nn.Module):
                         self._debug_first_batch_printed = True
 
                     optimizer.zero_grad()
-                    sv_outputs = self.net(sv_data).to(self.device)
+                    net_outputs = self.net(sv_data)
+                    if isinstance(net_outputs, (tuple, list)):
+                        sv_outputs = net_outputs[0]
+                        track_logits = net_outputs[1] if len(net_outputs) > 1 else None
+                    else:
+                        sv_outputs = net_outputs
+                        track_logits = None
+                    sv_outputs = sv_outputs.to(self.device)
+
+                    if sv_mask.dim() == 5:
+                        tgt_idx = self._resolve_tgt_index(sv_mask.size(2), self.tgt)
+                        sv_tgt_mask = sv_mask[:, :, tgt_idx, :, :]
+                    else:
+                        sv_tgt_mask = sv_mask
                     sv_losses = [
-                        c(sv_outputs, torch.argmax(sv_mask, axis=1)) for c in criterion
+                        c(sv_outputs, torch.argmax(sv_tgt_mask, axis=1)) for c in criterion
                     ]
                     loss = torch.mean(torch.stack(sv_losses))
+
+                    track_loss = None
+                    if self.mulmask and sv_mask.dim() == 5 and track_logits is not None:
+                        track_gt = build_track_heatmap(
+                            sv_mask, gamma=self.track_gamma, use_history=True
+                        )
+                        track_pred = torch.sigmoid(track_logits)
+                        if track_pred.shape == track_gt.shape:
+                            track_loss = F.smooth_l1_loss(track_pred, track_gt)
+                            loss = loss + self.track_weight * track_loss
+
                     loss.backward()
                     optimizer.step()
 
                     reduced_loss = self._reduce_scalar(loss.detach())
-                    reduced_ce = self._reduce_scalar(sv_losses[0].detach())
-                    reduced_dice = self._reduce_scalar(sv_losses[1].detach())
-
                     running_losses.append(float(reduced_loss.item()))
-                    running_ce_losses.append(float(reduced_ce.item()))
-                    running_dice_losses.append(float(reduced_dice.item()))
+                    if nb_losses > 1:
+                        reduced_ce = self._reduce_scalar(sv_losses[0].detach())
+                        reduced_dice = self._reduce_scalar(sv_losses[1].detach())
+                        running_ce_losses.append(float(reduced_ce.item()))
+                        running_dice_losses.append(float(reduced_dice.item()))
+                    if track_loss is not None:
+                        reduced_track = self._reduce_scalar(track_loss.detach())
+                        running_track_losses.append(float(reduced_track.item()))
 
                     if iteration % self.loss_step == 0:
-                        train_loss = np.mean(running_losses)
-                        train_ce_loss = np.mean(running_ce_losses)
-                        train_dice_loss = np.mean(running_dice_losses)
+                        train_loss = float(np.mean(running_losses)) if running_losses else 0.0
                         if self.is_main_process:
-                            if self.signal_type in "range_doppler":
-                                print(
-                                    "[Epoch {}/{}, iter {}]: Train loss (RD View) {}".format(
-                                        epoch + 1, self.nb_epochs, iteration, train_loss
-                                    )
-                                )
-                            elif self.signal_type in "range_angle":
-                                print(
-                                    "[Epoch {}/{}, iter {}]: Train loss (RA View) {}".format(
-                                        epoch + 1, self.nb_epochs, iteration, train_loss
-                                    )
-                                )
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}, iter {iteration}]: Train loss {train_loss}",
+                                flush=True,
+                            )
                             if nb_losses > 1:
+                                train_ce_loss = float(np.mean(running_ce_losses)) if running_ce_losses else 0.0
+                                train_dice_loss = float(np.mean(running_dice_losses)) if running_dice_losses else 0.0
                                 print(
-                                    "[Epoch {}/{}, iter {}]: Train CE loss {}".format(
-                                        epoch + 1, self.nb_epochs, iteration, train_ce_loss
-                                    )
-                                )
-                                print(
-                                    "[Epoch {}/{}, iter {}]: Train Dice loss {}".format(
-                                        epoch + 1, self.nb_epochs, iteration, train_dice_loss
-                                    )
+                                    f"[Epoch {epoch+1}/{self.nb_epochs}, iter {iteration}]: Train losses: CE={train_ce_loss}, Dice={train_dice_loss}",
+                                    flush=True,
                                 )
                                 self.visualizer.update_sv_train_loss(
                                     self.signal_type,
@@ -321,13 +402,26 @@ class ModelDDP(nn.Module):
                                     train_dice_loss,
                                     iteration,
                                 )
+                            else:
+                                train_ce_loss = train_loss
+                                self.visualizer.update_sv_train_global_only(
+                                    self.signal_type, train_loss, iteration
+                                )
+                            if running_track_losses:
+                                train_track_loss = float(np.mean(running_track_losses))
+                                print(
+                                    f"[Epoch {epoch+1}/{self.nb_epochs}, iter {iteration}]: Train Track loss {train_track_loss}",
+                                    flush=True,
+                                )
                             self.visualizer.update_learning_rate(
                                 scheduler.get_last_lr()[0], iteration
                             )
 
                         running_losses = []
-                        running_ce_losses = []
-                        running_dice_losses = []
+                        if nb_losses > 1:
+                            running_ce_losses = []
+                            running_dice_losses = []
+                        running_track_losses = []
 
                     if iteration % self.val_step == 0 and iteration > 0:
                         if self.is_main_process:
@@ -349,40 +443,21 @@ class ModelDDP(nn.Module):
                                 if self.signal_type in "range_doppler"
                                 else val_metrics["range_angle"]
                             )
-                            if self.signal_type in "range_doppler":
+                            view_tag = "RD" if self.signal_type in "range_doppler" else "RA"
+                            metric_key = "range_doppler" if self.signal_type in "range_doppler" else "range_angle"
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}] Val losses: {view_tag}={val_metrics[metric_key]['loss']}",
+                                flush=True,
+                            )
+                            if "track_loss" in val_metrics:
                                 print(
-                                    "[Epoch {}/{}]: Val loss (RD View) {}".format(
-                                        epoch + 1,
-                                        self.nb_epochs,
-                                        val_metrics["range_doppler"]["loss"],
-                                    )
+                                    f"[Epoch {epoch+1}/{self.nb_epochs}] Val Track losses: {view_tag}={val_metrics['track_loss']}",
+                                    flush=True,
                                 )
-                                print(
-                                    "[Epoch {}/{}] Val Metrics: Prec={}, mIoU={}, Dice={}".format(
-                                        epoch + 1,
-                                        self.nb_epochs,
-                                        vm["prec"],
-                                        vm["miou"],
-                                        vm["dice"],
-                                    )
-                                )
-                            elif self.signal_type in "range_angle":
-                                print(
-                                    "[Epoch {}/{}]: Val loss (RA View) {}".format(
-                                        epoch + 1,
-                                        self.nb_epochs,
-                                        val_metrics["range_angle"]["loss"],
-                                    )
-                                )
-                                print(
-                                    "[Epoch {}/{}] Val Metrics: Prec={}, mIoU={}, Dice={}".format(
-                                        epoch + 1,
-                                        self.nb_epochs,
-                                        vm["prec"],
-                                        vm["miou"],
-                                        vm["dice"],
-                                    )
-                                )
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}] Val Dice: {view_tag}={vm['dice']}",
+                                flush=True,
+                            )
 
                             test_metrics = self.tester.predict(
                                 model_for_eval, test_loader, add_temp=add_temp
@@ -390,52 +465,46 @@ class ModelDDP(nn.Module):
                             self.visualizer.update_sv_test_metrics(
                                 self.signal_type, test_metrics, iteration
                             )
-                            metric_key = (
-                                "range_doppler"
-                                if self.signal_type in "range_doppler"
-                                else "range_angle"
-                            )
                             cur_dice = test_metrics[metric_key]["dice"]
                             tm = test_metrics[metric_key]
+                            print(f"Learning Rate: {optimizer.param_groups[0]['lr']:.8f}", flush=True)
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}] Test losses: {view_tag}={tm['loss']}",
+                                flush=True,
+                            )
+                            if "track_loss" in test_metrics:
+                                print(
+                                    f"[Epoch {epoch+1}/{self.nb_epochs}] Test Track losses: {view_tag}={test_metrics['track_loss']}",
+                                    flush=True,
+                                )
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}] Test Prec: {view_tag}={tm['prec']}",
+                                flush=True,
+                            )
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}] Test mIoU: {view_tag}={tm['miou']}",
+                                flush=True,
+                            )
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}] Test Dice: {view_tag}={tm['dice']}",
+                                flush=True,
+                            )
                             if cur_dice > best_test_dice and iteration > 0:
                                 best_test_dice = cur_dice
-                                if self.signal_type in "range_doppler":
-                                    print(
-                                        "[Epoch {}/{}]: Test loss (RD View) {}".format(
-                                            epoch + 1,
-                                            self.nb_epochs,
-                                            tm["loss"],
-                                        )
-                                    )
-                                    print(
-                                        "[Epoch {}/{}] Test Metrics: Prec={}, mIoU={}, Dice={}".format(
-                                            epoch + 1,
-                                            self.nb_epochs,
-                                            tm["prec"],
-                                            tm["miou"],
-                                            tm["dice"],
-                                        )
-                                    )
-                                elif self.signal_type in "range_angle":
-                                    print(
-                                        "[Epoch {}/{}]: Test loss (RA View) {}".format(
-                                            epoch + 1,
-                                            self.nb_epochs,
-                                            tm["loss"],
-                                        )
-                                    )
-                                    print(
-                                        "[Epoch {}/{}] Test Metrics: Prec={}, mIoU={}, Dice={}".format(
-                                            epoch + 1,
-                                            self.nb_epochs,
-                                            tm["prec"],
-                                            tm["miou"],
-                                            tm["dice"],
-                                        )
-                                    )
-                                self.results["train_ce_loss"] = float(train_ce_loss)
-                                self.results["train_dice_loss"] = float(train_dice_loss)
+                                print(
+                                    f"[Epoch {epoch+1}/{self.nb_epochs}] New best test {view_tag} dice: {best_test_dice:.6f}. Saving checkpoint.",
+                                    flush=True,
+                                )
                                 self.results["train_loss"] = float(train_loss)
+                                self.results["train_ce_loss"] = float(train_ce_loss)
+                                if nb_losses > 1:
+                                    self.results["train_dice_loss"] = float(
+                                        train_dice_loss
+                                    )
+                                if running_track_losses:
+                                    self.results["train_track_loss"] = float(
+                                        np.mean(running_track_losses)
+                                    )
                                 self.results["val_metrics"] = val_metrics
                                 self.results["test_metrics"] = test_metrics
                                 save_state = {

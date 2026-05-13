@@ -111,12 +111,6 @@ class CarradaDataset(Dataset):
         ad_matrices = list()
         rd_masks = list()
         ra_masks = list()
-        # zyc@20231007
-        if self.mulmask == False:
-            rd_mask = np.load(os.path.join(self.path_to_annots, init_frame_name,
-                                       'range_doppler.npy'))
-            ra_mask = np.load(os.path.join(self.path_to_annots, init_frame_name,
-                                       'range_angle.npy'))
         for frame_name in frame_names:
             if self.process_signal:
                 rd_matrix = np.load(os.path.join(self.path_to_frames,
@@ -128,10 +122,9 @@ class CarradaDataset(Dataset):
                 ad_matrix = np.load(os.path.join(self.path_to_frames,
                                                  'angle_doppler_processed',
                                                  frame_name + '.npy'))
-                if self.mulmask:
-                    rd_mask = np.load(os.path.join(self.path_to_annots, frame_name,
+                rd_mask = np.load(os.path.join(self.path_to_annots, frame_name,
                                                'range_doppler.npy'))
-                    ra_mask = np.load(os.path.join(self.path_to_annots, frame_name,
+                ra_mask = np.load(os.path.join(self.path_to_annots, frame_name,
                                                'range_angle.npy'))
             else:
                 rd_matrix = np.load(os.path.join(self.path_to_frames,
@@ -143,18 +136,16 @@ class CarradaDataset(Dataset):
                 ad_matrix = np.load(os.path.join(self.path_to_frames,
                                                  'angle_doppler_raw',
                                                  frame_name + '.npy'))
-                if self.mulmask:
-                    rd_mask = np.load(os.path.join(self.path_to_annots, frame_name,
+                rd_mask = np.load(os.path.join(self.path_to_annots, frame_name,
                                                'range_doppler.npy'))
-                    ra_mask = np.load(os.path.join(self.path_to_annots, frame_name,
+                ra_mask = np.load(os.path.join(self.path_to_annots, frame_name,
                                                'range_angle.npy'))
 
             rd_matrices.append(rd_matrix)
             ra_matrices.append(ra_matrix)
             ad_matrices.append(ad_matrix)
-            if self.mulmask:
-                rd_masks.append(rd_mask)
-                ra_masks.append(ra_mask)
+            rd_masks.append(rd_mask)
+            ra_masks.append(ra_mask)
 
 
         # Apply the same transfo to all representations
@@ -169,9 +160,8 @@ class CarradaDataset(Dataset):
 
         rd_matrix = np.dstack(rd_matrices)
         rd_matrix = np.rollaxis(rd_matrix, axis=-1)
-        if self.mulmask:
-            rd_mask = np.stack(rd_masks)
-            rd_mask = rd_mask.transpose(1,0,2,3)
+        rd_mask = np.stack(rd_masks)
+        rd_mask = rd_mask.transpose(1,0,2,3)
 
 
 
@@ -187,9 +177,8 @@ class CarradaDataset(Dataset):
 
         ra_matrix = np.dstack(ra_matrices)
         ra_matrix = np.rollaxis(ra_matrix, axis=-1)
-        if self.mulmask:
-            ra_mask = np.stack(ra_masks)
-            ra_mask = ra_mask.transpose(1, 0, 2, 3)
+        ra_mask = np.stack(ra_masks)
+        ra_mask = ra_mask.transpose(1, 0, 2, 3)
 
         ra_frame = {'matrix': ra_matrix, 'mask': ra_mask}
         ra_frame = self.transform(ra_frame, is_vflip=is_vflip, is_hflip=is_hflip)

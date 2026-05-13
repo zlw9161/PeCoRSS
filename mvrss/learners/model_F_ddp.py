@@ -93,6 +93,14 @@ class ModelDDP(nn.Module):
         self.ema_update_after_step = int(self.cfg.get("ema_update_after_step", 100))
         self._ema_state = None
 
+        # Propagate configured target frame to model (controls x_tgt_ori selection).
+        model_for_set = self.net.module if hasattr(self.net, "module") else self.net
+        if hasattr(model_for_set, "set_tgt_index"):
+            try:
+                model_for_set.set_tgt_index(self.tgt)
+            except Exception:
+                pass
+
         # Only rank0 writes logs/boards.
         if _is_rank0():
             self.writer = SummaryWriter(self.paths["writer"])
@@ -307,22 +315,26 @@ class ModelDDP(nn.Module):
                     else:
                         rd_outputs, ra_outputs, rd_track_logits, ra_track_logits = self.net(rd_data, ra_data)
 
+                    rd_tgt_mask = rd_mask[:, :, self.tgt, :, :] if rd_mask.dim() == 5 else rd_mask
+                    ra_tgt_mask = ra_mask[:, :, self.tgt, :, :] if ra_mask.dim() == 5 else ra_mask
+
+                    rd_losses = [c(rd_outputs, torch.argmax(rd_tgt_mask, axis=1)) for c in rd_criterion[:2]]
+                    ra_losses = [c(ra_outputs, torch.argmax(ra_tgt_mask, axis=1)) for c in ra_criterion[:2]]
+                    rd_loss = torch.mean(torch.stack(rd_losses))
+                    ra_loss = torch.mean(torch.stack(ra_losses))
+
+                    if nb_losses > 3:
+                        coherence_loss = rd_criterion[3](rd_outputs, ra_outputs)
+                    else:
+                        coherence_loss = torch.tensor(0.0, device=rd_outputs.device)
+
+                    base_loss = self.rd_loss_weight * rd_loss + self.ra_loss_weight * ra_loss
+                    if nb_losses > 3:
+                        base_loss = base_loss + 0.5 * coherence_loss
+
+                    loss = torch.mean(base_loss)
+                    track_loss = torch.tensor(0.0, device=rd_outputs.device)
                     if self.mulmask:
-                        x_mask_rd = torch.sum(rd_mask, dim=2)
-                        x_mask_rd[x_mask_rd > 1] = 1
-                        x_mask_ra = torch.sum(ra_mask, dim=2)
-                        x_mask_ra[x_mask_ra > 1] = 1
-
-                        rd_losses = [c(rd_outputs, torch.argmax(rd_mask[:, :, -1, :, :], axis=1)) for c in rd_criterion[:2]]
-                        ra_losses = [c(ra_outputs, torch.argmax(ra_mask[:, :, -1, :, :], axis=1)) for c in ra_criterion[:2]]
-                        rd_loss = torch.mean(torch.stack(rd_losses))
-                        ra_loss = torch.mean(torch.stack(ra_losses))
-
-                        if nb_losses > 3:
-                            coherence_loss = rd_criterion[3](rd_outputs, ra_outputs)
-                        else:
-                            coherence_loss = torch.tensor(0.0, device=rd_outputs.device)
-
                         # Track heatmap regression (per-class) from history masks.
                         track_gt_rd = build_track_heatmap(rd_mask, gamma=self.track_gamma, use_history=True)
                         track_gt_ra = build_track_heatmap(ra_mask, gamma=self.track_gamma, use_history=True)
@@ -331,23 +343,7 @@ class ModelDDP(nn.Module):
                         track_loss_rd = F.smooth_l1_loss(track_pred_rd, track_gt_rd)
                         track_loss_ra = F.smooth_l1_loss(track_pred_ra, track_gt_ra)
                         track_loss = torch.mean(track_loss_ra + track_loss_rd)
-
-                        base_loss = (
-                            self.rd_loss_weight * rd_loss
-                            + self.ra_loss_weight * ra_loss
-                            + 0.5 * coherence_loss
-                        )
-                        loss = torch.mean(base_loss + self.track_weight * track_loss)
-                    else:
-                        rd_losses = [c(rd_outputs, torch.argmax(rd_mask, axis=1)) for c in rd_criterion[:2]]
-                        ra_losses = [c(ra_outputs, torch.argmax(ra_mask, axis=1)) for c in ra_criterion[:2]]
-                        rd_loss = torch.mean(torch.stack(rd_losses))
-                        ra_loss = torch.mean(torch.stack(ra_losses))
-                        loss = torch.mean(
-                            self.rd_loss_weight * rd_loss + self.ra_loss_weight * ra_loss
-                        )
-                        coherence_loss = torch.tensor(0.0, device=rd_outputs.device)
-                        track_loss = torch.tensor(0.0, device=rd_outputs.device)
+                        loss = torch.mean(loss + self.track_weight * track_loss)
 
                     loss.backward()
                     optimizer.step()
@@ -357,7 +353,8 @@ class ModelDDP(nn.Module):
                     rd_running_losses.append(rd_loss.detach().cpu().numpy().item())
                     ra_running_losses.append(ra_loss.detach().cpu().numpy().item())
                     coherence_running_losses.append(coherence_loss.detach().cpu().numpy().item())
-                    track_running_losses.append(track_loss.detach().cpu().numpy().item())
+                    if self.mulmask:
+                        track_running_losses.append(track_loss.detach().cpu().numpy().item())
 
                     if _is_rank0() and iteration % self.loss_step == 0:
                         train_loss = float(np.mean(running_losses)) if running_losses else 0.0

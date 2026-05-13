@@ -24,6 +24,13 @@ class TensorboardMultiLossVisualizer:
         self.writer.add_scalar('train_losses/Dice', losses[1],
                                iteration)
 
+    def update_sv_train_global_only(self, signal_type, global_loss, iteration):
+        """Single loss term (e.g. WCE only): log global scalar, no CE/Dice breakdown."""
+        if signal_type in 'range_doppler':
+            self.writer.add_scalar('train_losses/range_doppler/global', global_loss, iteration)
+        elif signal_type in 'range_angle':
+            self.writer.add_scalar('train_losses/range_angle/global', global_loss, iteration)
+
     def update_sv_train_loss(self, signal_type, global_loss, ce_loss, dice_loss, iteration):
         if signal_type in 'range_doppler':
             self.writer.add_scalar('train_losses/range_doppler/global', global_loss, iteration)
@@ -160,10 +167,12 @@ class TensorboardMultiLossVisualizer:
         if signal_type in 'range_doppler':
             self.writer.add_scalar('validation_losses/range_doppler/global',
                                    metrics['range_doppler']['loss'], iteration)
-            self.writer.add_scalar('validation_losses/range_doppler/CE',
-                                   metrics['range_doppler']['loss_ce'], iteration)
-            self.writer.add_scalar('validation_losses/range_doppler/Dice',
-                                   metrics['range_doppler']['loss_dice'], iteration)
+            if 'loss_ce' in metrics['range_doppler']:
+                self.writer.add_scalar('validation_losses/range_doppler/CE',
+                                       metrics['range_doppler']['loss_ce'], iteration)
+            if 'loss_dice' in metrics['range_doppler']:
+                self.writer.add_scalar('validation_losses/range_doppler/Dice',
+                                       metrics['range_doppler']['loss_dice'], iteration)
             self.writer.add_scalar('Range_Doppler_metrics/PixelAccuracy',
                                    metrics['range_doppler']['acc'],
                                    iteration)
@@ -183,10 +192,12 @@ class TensorboardMultiLossVisualizer:
         elif signal_type in 'range_angle':
             self.writer.add_scalar('validation_losses/range_angle/global',
                                    metrics['range_angle']['loss'], iteration)
-            self.writer.add_scalar('validation_losses/range_angle/CE',
-                                   metrics['range_angle']['loss_ce'], iteration)
-            self.writer.add_scalar('validation_losses/range_angle/Dice',
-                                   metrics['range_angle']['loss_dice'], iteration)
+            if 'loss_ce' in metrics['range_angle']:
+                self.writer.add_scalar('validation_losses/range_angle/CE',
+                                       metrics['range_angle']['loss_ce'], iteration)
+            if 'loss_dice' in metrics['range_angle']:
+                self.writer.add_scalar('validation_losses/range_angle/Dice',
+                                       metrics['range_angle']['loss_dice'], iteration)
             self.writer.add_scalar('Range_angle_metrics/PixelAccuracy',
                                    metrics['range_angle']['acc'],
                                    iteration)
@@ -261,10 +272,12 @@ class TensorboardMultiLossVisualizer:
         if signal_type in 'range_doppler':
             self.writer.add_scalar('test_losses/range_doppler/global',
                                    metrics['range_doppler']['loss'], iteration)
-            self.writer.add_scalar('test_losses/range_doppler/CE',
-                                   metrics['range_doppler']['loss_ce'], iteration)
-            self.writer.add_scalar('test_losses/range_doppler/Dice',
-                                   metrics['range_doppler']['loss_dice'], iteration)
+            if 'loss_ce' in metrics['range_doppler']:
+                self.writer.add_scalar('test_losses/range_doppler/CE',
+                                       metrics['range_doppler']['loss_ce'], iteration)
+            if 'loss_dice' in metrics['range_doppler']:
+                self.writer.add_scalar('test_losses/range_doppler/Dice',
+                                       metrics['range_doppler']['loss_dice'], iteration)
             self.writer.add_scalar('test_metrics/Range_Doppler_metrics/PixelAccuracy',
                                    metrics['range_doppler']['acc'],
                                    iteration)
@@ -284,10 +297,12 @@ class TensorboardMultiLossVisualizer:
         elif signal_type in 'range_angle':
             self.writer.add_scalar('test_losses/range_angle/global',
                                    metrics['range_angle']['loss'], iteration)
-            self.writer.add_scalar('test_losses/range_angle/CE',
-                                   metrics['range_angle']['loss_ce'], iteration)
-            self.writer.add_scalar('test_losses/range_angle/Dice',
-                                   metrics['range_angle']['loss_dice'], iteration)
+            if 'loss_ce' in metrics['range_angle']:
+                self.writer.add_scalar('test_losses/range_angle/CE',
+                                       metrics['range_angle']['loss_ce'], iteration)
+            if 'loss_dice' in metrics['range_angle']:
+                self.writer.add_scalar('test_losses/range_angle/Dice',
+                                       metrics['range_angle']['loss_dice'], iteration)
             self.writer.add_scalar('test_metrics/Range_angle_metrics/PixelAccuracy',
                                    metrics['range_angle']['acc'],
                                    iteration)

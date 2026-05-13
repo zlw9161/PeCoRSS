@@ -27,6 +27,13 @@ class SequenceDataset(Dataset):
         return seq_name, self.dataset[seq_name]
 
 
+def _frame_id_from_entry(frame_entry):
+    """Resolve frame id whether JSON stores plain str or legacy [frame_id, ...] rows."""
+    if isinstance(frame_entry, (list, tuple)):
+        return frame_entry[0]
+    return frame_entry
+
+
 class PeCoRSVDataset(Dataset):
     """DataLoader class for Radar sequences from different sources
     Load frames, only for semantic segmentation
@@ -53,7 +60,7 @@ class PeCoRSVDataset(Dataset):
     """
 
     def __init__(self, dataset, dataset_type, annotation_type, signal_type, path_to_frames, process_signal,
-                 n_frames, cmplx_flag=False, transformations=None, add_temp=False):
+                 n_frames, cmplx_flag=False, transformations=None, add_temp=False, mulmask=False):
         self.dataset = dataset
         self.dataset_type = dataset_type
         self.annotation_type = annotation_type
@@ -64,6 +71,7 @@ class PeCoRSVDataset(Dataset):
         self.cmplx_flag = cmplx_flag
         self.transformations = transformations
         self.add_temp = add_temp
+        self.mulmask = bool(mulmask)
         self._warned_bad_samples = set()
         # self.dataset = self.dataset[self.n_frames-1:]  # remove n first frames
         if self.dataset_type in ['CarradaRAC_RD', 'CarradaRAC_RA']:
@@ -136,19 +144,26 @@ class PeCoRSVDataset(Dataset):
         ) from last_exc
 
     def _load_item(self, idx):
-        init_frame_name = self.dataset[idx+self.n_frames-1][0]
+        init_frame_entry = self.dataset[idx + self.n_frames - 1]
+        init_frame_name = _frame_id_from_entry(init_frame_entry)
         if self.dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
-            frame_id = int(init_frame_name)
+            frame_id = int(str(init_frame_name))
             frame_names = [str(f_id).zfill(6) for f_id in range(frame_id-self.n_frames+1, frame_id+1)]
         else:
-            frame_names = [self.dataset[f_id][0] for f_id in range(idx, idx+self.n_frames)]
+            frame_names = [
+                str(_frame_id_from_entry(self.dataset[f_id]))
+                for f_id in range(idx, idx + self.n_frames)
+            ]
         matrices = []
-        mask = np.load(
-            os.path.join(self.path_to_annots, init_frame_name, self.signal_type + ".npy")
-        )
-        if self.dataset_type == 'LSFJamming':
-            mask = torch.nn.functional.one_hot(torch.from_numpy(mask).long(), num_classes=7)
-            mask = mask.permute(2, 0, 1).float().numpy()
+        if self.mulmask:
+            masks = []
+        else:
+            mask = np.load(
+                os.path.join(self.path_to_annots, init_frame_name, self.signal_type + ".npy")
+            )
+            if self.dataset_type == 'LSFJamming':
+                mask = torch.nn.functional.one_hot(torch.from_numpy(mask).long(), num_classes=7)
+                mask = mask.permute(2, 0, 1).float().numpy()
         for frame_name in frame_names:
             if self.dataset_type in ['Carrada_RD', 'Carrada_RA', 'CarradaRAC_RD', 'CarradaRAC_RA']:
                 if self.process_signal:
@@ -213,6 +228,14 @@ class PeCoRSVDataset(Dataset):
                 )
 
             matrices.append(matrix)
+            if self.mulmask:
+                mask_i = np.load(
+                    os.path.join(self.path_to_annots, frame_name, self.signal_type + ".npy")
+                )
+                if self.dataset_type == 'LSFJamming':
+                    mask_i = torch.nn.functional.one_hot(torch.from_numpy(mask_i).long(), num_classes=7)
+                    mask_i = mask_i.permute(2, 0, 1).float().numpy()
+                masks.append(mask_i)
 
         # Apply the same transfo to all representations
         if np.random.uniform(0, 1) > 0.5:
@@ -225,6 +248,9 @@ class PeCoRSVDataset(Dataset):
             is_hflip = False
 
         matrix = np.array([np.array(sub_list) for sub_list in matrices])
+        if self.mulmask:
+            # Keep the same mask layout as mvrss: [C, T, H, W] before batching.
+            mask = np.stack(masks).transpose(1, 0, 2, 3)
         frame0 = {"matrix": matrix, "mask": mask}
         frame0 = self.transform(frame0, is_vflip=is_vflip, is_hflip=is_hflip)
         if self.add_temp:
@@ -289,12 +315,12 @@ class Flip:
         matrix, mask = frame['matrix'], frame['mask']
         h_flip_proba = np.random.uniform(0, 1)
         if h_flip_proba < self.proba:
-            matrix = np.flip(matrix, axis=1).copy()
-            mask = np.flip(mask, axis=1).copy()
+            matrix = np.flip(matrix, axis=-2).copy()
+            mask = np.flip(mask, axis=-2).copy()
         v_flip_proba = np.random.uniform(0, 1)
         if v_flip_proba < self.proba:
-            matrix = np.flip(matrix, axis=2).copy()
-            mask = np.flip(mask, axis=2).copy()
+            matrix = np.flip(matrix, axis=-1).copy()
+            mask = np.flip(mask, axis=-1).copy()
         return {'matrix': matrix, 'mask': mask}
 
 
@@ -308,8 +334,8 @@ class HFlip:
 
     def __call__(self, frame):
         matrix, mask = frame['matrix'], frame['mask']
-        matrix = np.flip(matrix, axis=1).copy()
-        mask = np.flip(mask, axis=1).copy()
+        matrix = np.flip(matrix, axis=-2).copy()
+        mask = np.flip(mask, axis=-2).copy()
         return {'matrix': matrix, 'mask': mask}
 
 
@@ -323,8 +349,8 @@ class VFlip:
 
     def __call__(self, frame):
         matrix, mask = frame['matrix'], frame['mask']
-        matrix = np.flip(matrix, axis=2).copy()
-        mask = np.flip(mask, axis=2).copy()
+        matrix = np.flip(matrix, axis=-1).copy()
+        mask = np.flip(mask, axis=-1).copy()
         return {'matrix': matrix, 'mask': mask}
 
 

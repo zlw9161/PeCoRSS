@@ -73,6 +73,12 @@ class Tester:
         if self.progress_every_seqs is not None or self.progress_every_frames is not None:
             print(msg, flush=True)
 
+    def _mask_tgt_frame(self, mask_seq: torch.Tensor) -> torch.Tensor:
+        """(B,C,T,H,W) -> (B,C,H,W) at cfg tgt; passthrough if already (B,C,H,W)."""
+        if mask_seq.dim() == 5:
+            return mask_seq[:, :, self.tgt, :, :]
+        return mask_seq
+
     def predict(self, net, seq_loader, lamda=None, iteration=None, get_quali=False, add_temp=True):
         """
         Method to predict on a given dataset using a fixed model
@@ -157,25 +163,23 @@ class Tester:
                         rd_outputs, x_pre = net(rd_data)
                         rd_outputs = rd_outputs.to(self.device)
                         if get_quali:
-                            if self.mulmask:
-                                quali_iter_rd = get_qualitatives(rd_outputs, rd_mask[:,:,-1,:,:], self.paths,
-                                                                 seq_name, quali_iter_rd, 'range_doppler')
-                            else:
-                                quali_iter_rd = get_qualitatives(rd_outputs, rd_mask, self.paths,
-                                                                 seq_name, quali_iter_rd, 'range_doppler')
+                            quali_iter_rd = get_qualitatives(
+                                rd_outputs, self._mask_tgt_frame(rd_mask), self.paths,
+                                seq_name, quali_iter_rd, 'range_doppler')
+                        rd_gt = self._mask_tgt_frame(rd_mask)
                         if self.mulmask:
-                            rd_metrics.add_batch(torch.argmax(rd_mask[:,:,-1,:,:], axis=1).cpu(),
+                            rd_metrics.add_batch(torch.argmax(rd_gt, axis=1).cpu(),
                                                  torch.argmax(rd_outputs, axis=1).cpu())
                             if nb_losses < 3:
                                 # Case without the CoL
-                                rd_losses = [c(rd_outputs, torch.argmax(rd_mask[:,:,-1,:,:], axis=1))
+                                rd_losses = [c(rd_outputs, torch.argmax(rd_gt, axis=1))
                                              for c in rd_criterion]
                                 loss = torch.mean(torch.stack(rd_losses))
 
                             else:
                                 # Case with the CoL
                                 # Select the wCE and wSDice
-                                rd_losses = [c(rd_outputs, torch.argmax(rd_mask[:,:,-1,:,:], axis=1))
+                                rd_losses = [c(rd_outputs, torch.argmax(rd_gt, axis=1))
                                              for c in rd_criterion[:2]]
                                 loss = torch.mean(torch.stack(rd_losses))
                             x_mask = torch.sum(rd_mask, dim=2)  # (b,4,h,w)
@@ -183,19 +187,19 @@ class Tester:
                             track_loss = rd_criterion[0](x_pre, torch.argmax(x_mask, axis=1))
                             loss = torch.mean(loss + track_loss)
                         else:
-                            rd_metrics.add_batch(torch.argmax(rd_mask, axis=1).cpu(),
+                            rd_metrics.add_batch(torch.argmax(rd_gt, axis=1).cpu(),
                                                  torch.argmax(rd_outputs, axis=1).cpu())
 
                             if nb_losses < 3:
                                 # Case without the CoL
-                                rd_losses = [c(rd_outputs, torch.argmax(rd_mask, axis=1))
+                                rd_losses = [c(rd_outputs, torch.argmax(rd_gt, axis=1))
                                              for c in rd_criterion]
                                 loss = torch.mean(torch.stack(rd_losses))
 
                             else:
                                 # Case with the CoL
                                 # Select the wCE and wSDice
-                                rd_losses = [c(rd_outputs, torch.argmax(rd_mask, axis=1))
+                                rd_losses = [c(rd_outputs, torch.argmax(rd_gt, axis=1))
                                              for c in rd_criterion[:2]]
                                 loss = torch.mean(torch.stack(rd_losses))
 
@@ -211,25 +215,23 @@ class Tester:
                         ra_outputs, x_pre = net(ra_data)
                         ra_outputs = ra_outputs.to(self.device)
                         if get_quali:
-                            if self.mulmask:
-                                quali_iter_rd = get_qualitatives(ra_outputs, ra_mask[:, :, -1, :, :], self.paths,
-                                                                 seq_name, quali_iter_rd, 'range_angle')
-                            else:
-                                quali_iter_rd = get_qualitatives(ra_outputs, ra_mask, self.paths,
-                                                                 seq_name, quali_iter_rd, 'range_angle')
+                            quali_iter_rd = get_qualitatives(
+                                ra_outputs, self._mask_tgt_frame(ra_mask), self.paths,
+                                seq_name, quali_iter_rd, 'range_angle')
+                        ra_gt = self._mask_tgt_frame(ra_mask)
                         if self.mulmask:
-                            ra_metrics.add_batch(torch.argmax(ra_mask[:, :, -1, :, :], axis=1).cpu(),
+                            ra_metrics.add_batch(torch.argmax(ra_gt, axis=1).cpu(),
                                                  torch.argmax(ra_outputs, axis=1).cpu())
                             if nb_losses < 3:
                                 # Case without the CoL
-                                ra_losses = [c(ra_outputs, torch.argmax(ra_mask[:, :, -1, :, :], axis=1))
+                                ra_losses = [c(ra_outputs, torch.argmax(ra_gt, axis=1))
                                              for c in ra_criterion]
                                 loss = torch.mean(torch.stack(ra_losses))
 
                             else:
                                 # Case with the CoL
                                 # Select the wCE and wSDice
-                                ra_losses = [c(ra_outputs, torch.argmax(ra_mask[:, :, -1, :, :], axis=1))
+                                ra_losses = [c(ra_outputs, torch.argmax(ra_gt, axis=1))
                                              for c in ra_criterion[:2]]
                                 loss = torch.mean(torch.stack(ra_losses))
                             x_mask = torch.sum(ra_mask, dim=2)  # (b,4,h,w)
@@ -237,19 +239,19 @@ class Tester:
                             track_loss = ra_criterion[0](x_pre, torch.argmax(x_mask, axis=1))
                             loss = torch.mean(loss + track_loss)
                         else:
-                            ra_metrics.add_batch(torch.argmax(ra_mask, axis=1).cpu(),
+                            ra_metrics.add_batch(torch.argmax(ra_gt, axis=1).cpu(),
                                                  torch.argmax(ra_outputs, axis=1).cpu())
 
                             if nb_losses < 3:
                                 # Case without the CoL
-                                ra_losses = [c(ra_outputs, torch.argmax(ra_mask, axis=1))
+                                ra_losses = [c(ra_outputs, torch.argmax(ra_gt, axis=1))
                                              for c in ra_criterion]
                                 loss = torch.mean(torch.stack(ra_losses))
 
                             else:
                                 # Case with the CoL
                                 # Select the wCE and wSDice
-                                ra_losses = [c(ra_outputs, torch.argmax(ra_mask, axis=1))
+                                ra_losses = [c(ra_outputs, torch.argmax(ra_gt, axis=1))
                                              for c in ra_criterion[:2]]
                                 loss = torch.mean(torch.stack(ra_losses))
 
@@ -276,38 +278,34 @@ class Tester:
                             rd_outputs, ra_outputs, rd_track_logits, ra_track_logits = net(rd_data, ra_data)
                         rd_outputs = rd_outputs.to(self.device)
                         ra_outputs = ra_outputs.to(self.device)
+                        rd_gt = self._mask_tgt_frame(rd_mask)
+                        ra_gt = self._mask_tgt_frame(ra_mask)
                         if get_quali:
-                            if self.mulmask:
-                                quali_iter_rd = get_qualitatives(rd_outputs, rd_mask[:,:,self.tgt,:,:], self.paths,
-                                                                 seq_name, quali_iter_rd, 'range_doppler')
-                                quali_iter_ra = get_qualitatives(ra_outputs, ra_mask[:,:,self.tgt,:,:], self.paths,
-                                                                 seq_name, quali_iter_ra, 'range_angle')
-                            else:
-                                quali_iter_rd = get_qualitatives(rd_outputs, rd_mask, self.paths,
-                                                                 seq_name, quali_iter_rd, 'range_doppler')
-                                quali_iter_ra = get_qualitatives(ra_outputs, ra_mask, self.paths,
-                                                                 seq_name, quali_iter_ra, 'range_angle')
+                            quali_iter_rd = get_qualitatives(rd_outputs, rd_gt, self.paths,
+                                                             seq_name, quali_iter_rd, 'range_doppler')
+                            quali_iter_ra = get_qualitatives(ra_outputs, ra_gt, self.paths,
+                                                             seq_name, quali_iter_ra, 'range_angle')
                         if self.mulmask:
-                            rd_metrics.add_batch(torch.argmax(rd_mask[:,:,self.tgt,:,:], axis=1).cpu(),
+                            rd_metrics.add_batch(torch.argmax(rd_gt, axis=1).cpu(),
                                                  torch.argmax(rd_outputs, axis=1).cpu())
-                            ra_metrics.add_batch(torch.argmax(ra_mask[:,:,self.tgt,:,:], axis=1).cpu(),
+                            ra_metrics.add_batch(torch.argmax(ra_gt, axis=1).cpu(),
                                                  torch.argmax(ra_outputs, axis=1).cpu())
                             if nb_losses < 4:
                                 # Case without the CoL
-                                rd_losses = [c(rd_outputs, torch.argmax(rd_mask[:,:,self.tgt,:,:], axis=1))
+                                rd_losses = [c(rd_outputs, torch.argmax(rd_gt, axis=1))
                                              for c in rd_criterion[:2]]
                                 rd_loss = torch.mean(torch.stack(rd_losses))
-                                ra_losses = [c(ra_outputs, torch.argmax(ra_mask[:,:,self.tgt,:,:], axis=1))
+                                ra_losses = [c(ra_outputs, torch.argmax(ra_gt, axis=1))
                                              for c in ra_criterion[:2]]
                                 ra_loss = torch.mean(torch.stack(ra_losses))
                                 loss = torch.mean(rd_loss + ra_loss)
                             else:
                                 # Case with the CoL
                                 # Select the wCE and wSDice
-                                rd_losses = [c(rd_outputs, torch.argmax(rd_mask[:,:,self.tgt,:,:], axis=1))
+                                rd_losses = [c(rd_outputs, torch.argmax(rd_gt, axis=1))
                                              for c in rd_criterion[:2]]
                                 rd_loss = torch.mean(torch.stack(rd_losses))
-                                ra_losses = [c(ra_outputs, torch.argmax(ra_mask[:,:,self.tgt,:,:], axis=1))
+                                ra_losses = [c(ra_outputs, torch.argmax(ra_gt, axis=1))
                                              for c in ra_criterion[:2]]
                                 ra_loss = torch.mean(torch.stack(ra_losses))
                                 # Coherence loss
@@ -334,26 +332,26 @@ class Tester:
                             track_loss = torch.mean(track_loss_ra + track_loss_rd)
                             loss = torch.mean(loss + track_loss)
                         else:
-                            rd_metrics.add_batch(torch.argmax(rd_mask, axis=1).cpu(),
+                            rd_metrics.add_batch(torch.argmax(rd_gt, axis=1).cpu(),
                                                  torch.argmax(rd_outputs, axis=1).cpu())
-                            ra_metrics.add_batch(torch.argmax(ra_mask, axis=1).cpu(),
+                            ra_metrics.add_batch(torch.argmax(ra_gt, axis=1).cpu(),
                                                  torch.argmax(ra_outputs, axis=1).cpu())
                             if nb_losses < 4:
                                 # Case without the CoL
-                                rd_losses = [c(rd_outputs, torch.argmax(rd_mask, axis=1))
+                                rd_losses = [c(rd_outputs, torch.argmax(rd_gt, axis=1))
                                              for c in rd_criterion[:2]]
                                 rd_loss = torch.mean(torch.stack(rd_losses))
-                                ra_losses = [c(ra_outputs, torch.argmax(ra_mask, axis=1))
+                                ra_losses = [c(ra_outputs, torch.argmax(ra_gt, axis=1))
                                              for c in ra_criterion[:2]]
                                 ra_loss = torch.mean(torch.stack(ra_losses))
                                 loss = torch.mean(rd_loss + ra_loss)
                             else:
                                 # Case with the CoL
                                 # Select the wCE and wSDice
-                                rd_losses = [c(rd_outputs, torch.argmax(rd_mask, axis=1))
+                                rd_losses = [c(rd_outputs, torch.argmax(rd_gt, axis=1))
                                              for c in rd_criterion[:2]]
                                 rd_loss = torch.mean(torch.stack(rd_losses))
-                                ra_losses = [c(ra_outputs, torch.argmax(ra_mask, axis=1))
+                                ra_losses = [c(ra_outputs, torch.argmax(ra_gt, axis=1))
                                              for c in ra_criterion[:2]]
                                 ra_loss = torch.mean(torch.stack(ra_losses))
                                 # Coherence loss
@@ -378,10 +376,7 @@ class Tester:
                         if j == rand_frame:
                             if self.signal_type == 'range_doppler':
                                 rd_pred_masks = torch.argmax(rd_outputs, axis=1)[:5]
-                                if self.mulmask:
-                                    rd_gt_masks = torch.argmax(rd_mask[:, :, -1, :, :], axis=1)[:5]
-                                else:
-                                    rd_gt_masks = torch.argmax(rd_mask, axis=1)[:5]
+                                rd_gt_masks = torch.argmax(self._mask_tgt_frame(rd_mask), axis=1)[:5]
                                 rd_pred_grid = make_grid(transform_masks_viz(rd_pred_masks,
                                                                              self.nb_classes))
                                 rd_gt_grid = make_grid(transform_masks_viz(rd_gt_masks,
@@ -389,10 +384,7 @@ class Tester:
                                 self.visualizer.update_img_masks(rd_pred_grid, rd_gt_grid, iteration)
                             elif self.signal_type == 'range_angle':
                                 ra_pred_masks = torch.argmax(ra_outputs, axis=1)[:5]
-                                if self.mulmask:
-                                    ra_gt_masks = torch.argmax(ra_mask[:, :, -1, :, :], axis=1)[:5]
-                                else:
-                                    ra_gt_masks = torch.argmax(ra_mask, axis=1)[:5]
+                                ra_gt_masks = torch.argmax(self._mask_tgt_frame(ra_mask), axis=1)[:5]
                                 ra_pred_grid = make_grid(transform_masks_viz(ra_pred_masks,
                                                                              self.nb_classes))
                                 ra_gt_grid = make_grid(transform_masks_viz(ra_gt_masks,
@@ -401,12 +393,8 @@ class Tester:
                             elif self.signal_type == 'range_doppler_angle':
                                 rd_pred_masks = torch.argmax(rd_outputs, axis=1)[:5]
                                 ra_pred_masks = torch.argmax(ra_outputs, axis=1)[:5]
-                                if self.mulmask:
-                                    rd_gt_masks = torch.argmax(rd_mask[:, :, self.tgt, :, :], axis=1)[:5]
-                                    ra_gt_masks = torch.argmax(ra_mask[:, :, self.tgt, :, :], axis=1)[:5]
-                                else:
-                                    rd_gt_masks = torch.argmax(rd_mask, axis=1)[:5]
-                                    ra_gt_masks = torch.argmax(ra_mask, axis=1)[:5]
+                                rd_gt_masks = torch.argmax(self._mask_tgt_frame(rd_mask), axis=1)[:5]
+                                ra_gt_masks = torch.argmax(self._mask_tgt_frame(ra_mask), axis=1)[:5]
 
                                 rd_pred_grid = make_grid(transform_masks_viz(rd_pred_masks,
                                                                              self.nb_classes))

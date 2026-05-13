@@ -355,46 +355,66 @@ class EncodingBranch(nn.Module):
 
 
 class TFocNet(nn.Module):
-    """
-    Temporal Focus Net (single-view)
-    """
+    """Single-view TFoc block-attention model (RD or RA)."""
 
-    def __init__(self, n_classes, n_frames, signal_type, zero_doppler_filter=False, search_size=5):
+    def __init__(
+        self,
+        n_classes,
+        n_frames,
+        search_size=5,
+        signal_type="range_doppler",
+        zero_doppler_filter=True,
+    ):
         super().__init__()
         self.n_classes = n_classes
         self.n_frames = n_frames
         self.view_type = signal_type
         self.zero_doppler_filter = zero_doppler_filter
+        self.tgt_index = -1
 
-        # Keep the original att4_v2 TFoc block; search size is configurable from config.
-        self.search_size = int(search_size)
+        if isinstance(search_size, (tuple, list)):
+            if len(search_size) >= 2:
+                ss = int(search_size[0]) if self.view_type in ("range_doppler", "angle_doppler") else int(search_size[1])
+            else:
+                ss = int(search_size[0])
+        else:
+            ss = int(search_size)
 
-        # Backbone (single-view encoding)
-        self.encoding_branch = EncodingBranch(self.view_type, self.n_frames, self.search_size)
+        self.encoding_branch = EncodingBranch(self.view_type, self.n_frames, ss)
 
-        # ASPP
         self.aspp_block = ASPPBlock(in_ch=128, out_ch=128)
         self.single_conv_block1_1x1 = ConvBlock(in_ch=640, out_ch=128, k_size=1, pad=0, dil=1)
-
-        # Latent branch
         self.single_conv_block2_1x1 = ConvBlock(in_ch=128, out_ch=128, k_size=1, pad=0, dil=1)
 
-        # Decoder
-        if self.view_type in ('range_doppler', 'angle_doppler'):
+        if self.view_type in ("range_doppler", "angle_doppler"):
             self.upconv1 = nn.ConvTranspose2d(256, 128, (2, 1), stride=(2, 1))
             self.upconv2 = nn.ConvTranspose2d(128, 128, (2, 1), stride=(2, 1))
+            self.upconv1_prb = nn.ConvTranspose2d(64, 32, (2, 1), stride=(2, 1))
+            self.upconv2_prb = nn.ConvTranspose2d(32, 32, (2, 1), stride=(2, 1))
         else:
             self.upconv1 = nn.ConvTranspose2d(256, 128, 2, stride=2)
             self.upconv2 = nn.ConvTranspose2d(128, 128, 2, stride=2)
+            self.upconv1_prb = nn.ConvTranspose2d(64, 32, 2, stride=2)
+            self.upconv2_prb = nn.ConvTranspose2d(32, 32, 2, stride=2)
+
         self.double_conv_block1 = DoubleConvBlock(in_ch=128, out_ch=128, k_size=3, pad=1, dil=1)
         self.double_conv_block2 = DoubleConvBlock(in_ch=128, out_ch=128, k_size=3, pad=1, dil=1)
         self.final = nn.Conv2d(in_channels=128, out_channels=n_classes, kernel_size=1)
 
-    def forward(self, x):
-        if self.zero_doppler_filter and self.view_type in ('range_doppler', 'angle_doppler'):
+        self.single_conv_block2_1x1_prb = ConvBlock(in_ch=32 * 2, out_ch=32, k_size=1, pad=0, dil=1)
+        self.double_conv_block1_prb = DoubleConvBlock(in_ch=32, out_ch=32, k_size=3, pad=1, dil=1)
+        self.double_conv_block2_prb = DoubleConvBlock(in_ch=32, out_ch=32, k_size=3, pad=1, dil=1)
+        self.final_prb = nn.Conv2d(in_channels=32, out_channels=n_classes, kernel_size=1, padding=0)
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.encoding_branch.set_tgt_index(self.tgt_index)
+
+    def forward(self, x, *args, **kwargs):
+        if self.zero_doppler_filter and self.view_type in ("range_doppler", "angle_doppler"):
             x = self._zero_doppler_filter(x)
 
-        features, latent = self.encoding_branch(x)
+        features, latent, prb, prb_latent = self.encoding_branch(x)
 
         x1 = self.aspp_block(features)
         x2 = self.single_conv_block1_1x1(x1)
@@ -406,7 +426,17 @@ class TFocNet(nn.Module):
         x7 = self.upconv2(x6)
         x8 = self.double_conv_block2(x7)
         x9 = self.final(x8)
-        return x9
+
+        prb_fusion = torch.cat((prb, prb_latent), 1)
+        prb_fusion = self.single_conv_block2_1x1_prb(prb_fusion)
+        x4_prb = torch.cat((prb, prb_fusion), 1)
+        x5_prb = self.upconv1_prb(x4_prb)
+        x6_prb = self.double_conv_block1_prb(x5_prb)
+        x7_prb = self.upconv2_prb(x6_prb)
+        x8_prb = self.double_conv_block2_prb(x7_prb)
+        x9_prb = self.final_prb(x8_prb)
+
+        return x9, x9_prb
 
     def _zero_doppler_filter(self, rd):
         device = rd.device

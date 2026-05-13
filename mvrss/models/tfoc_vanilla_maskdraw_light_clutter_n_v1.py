@@ -138,6 +138,7 @@ class TFocConvV1(nn.Module):
         self.k_n = int(search_size)
         self.pad_size = math.floor(self.k_n / 2)
         self.attn_temperature = float(attn_temperature)
+        self.tgt_index = -1
 
         self.spatial_conv = Double3DConvBlock(
             in_ch,
@@ -160,14 +161,31 @@ class TFocConvV1(nn.Module):
             TREBlock(out_ch, out_ch, k_size=(1, 1, 1), strd=(1, 1, 1), pad=(0, 0, 0)),
         )
 
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+
+    @staticmethod
+    def _resolve_tgt_index(t: int, tgt_index: int) -> int:
+        if t <= 0:
+            return 0
+        idx = int(tgt_index)
+        if idx < 0:
+            idx = t + idx
+        if idx < 0:
+            idx = 0
+        if idx > t - 1:
+            idx = t - 1
+        return idx
+
     def forward(self, x_seq: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         x_seq = self.spatial_conv(x_seq)  # (b, btnk_ch, t, h, w)
         b, c, t, h, w = x_seq.shape
         device = x_seq.device
         n = self.k_n * self.k_n
 
-        # Target (last frame)
-        x_tgt_ori = x_seq[:, :, -1, :, :].unsqueeze(2)  # (b,c,1,h,w)
+        # Target (configurable frame index)
+        tgt_i = self._resolve_tgt_index(t, self.tgt_index)
+        x_tgt_ori = x_seq[:, :, tgt_i, :, :].unsqueeze(2)  # (b,c,1,h,w)
         x_tgt = self.tfoc_prepadding(x_tgt_ori.repeat(1, 1, t - 1, 1, 1))  # (b,c,t-1,hp,wp)
         x_hst = self.tfoc_prepadding(x_seq[:, :, : t - 1, :, :])  # (b,c,t-1,hp,wp)
 
@@ -276,6 +294,11 @@ class EncodingBranch(nn.Module):
             search_size=5,
             attn_temperature=1.0,
         )
+        self.tgt_index = -1
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.tfoc_conv_block.set_tgt_index(self.tgt_index)
 
         self.doppler_max_pool = nn.MaxPool2d(2, stride=(2, 1))
         self.max_pool = nn.MaxPool2d(2, stride=2)
@@ -330,6 +353,13 @@ class TFocNet(nn.Module):
         self.rd_encoding_branch = EncodingBranch("range_doppler", self.n_frames)
         self.ra_encoding_branch = EncodingBranch("range_angle", self.n_frames)
         self.ad_encoding_branch = EncodingBranch("angle_doppler", self.n_frames)
+        self.tgt_index = -1
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.rd_encoding_branch.set_tgt_index(self.tgt_index)
+        self.ra_encoding_branch.set_tgt_index(self.tgt_index)
+        self.ad_encoding_branch.set_tgt_index(self.tgt_index)
 
         self.rd_aspp_block = ASPPBlock(in_ch=128, out_ch=128)
         self.ra_aspp_block = ASPPBlock(in_ch=128, out_ch=128)

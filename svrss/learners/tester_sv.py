@@ -3,6 +3,7 @@ import json
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 
@@ -14,6 +15,9 @@ from svrss.utils.functions import (
     define_loss,
     get_transformations,
     get_qualitatives,
+    build_track_heatmap,
+    resolve_class_weights_dir,
+    resolve_tvt_stats_json_path,
 )
 from svrss.utils.metrics import Evaluator
 from svrss.utils.paths import Paths
@@ -38,6 +42,9 @@ class TesterSV:
         self.norm_type = self.cfg["norm_type"]
         self.paths = Paths().get()
         self.cmplx_flag = self.cfg.get("cmplx_flag", False)
+        self.mulmask = bool(self.cfg.get("mulmask", False))
+        self.track_gamma = float(self.cfg.get("track_gamma", 0.9))
+        self.tgt = int(self.cfg.get("tgt", -1))
         self.test_results = dict()
         self.visualizer = visualizer
 
@@ -75,24 +82,56 @@ class TesterSV:
             f"tester_sv: unsupported cfg['dataset']={self.cfg.get('dataset')!r} for path resolution."
         )
 
+    @staticmethod
+    def _resolve_tgt_index(t: int, tgt_index: int) -> int:
+        if t <= 0:
+            return 0
+        idx = int(tgt_index)
+        if idx < 0:
+            idx = t + idx
+        if idx < 0:
+            idx = 0
+        if idx > t - 1:
+            idx = t - 1
+        return idx
+
     def predict(self, net, seq_loader, iteration=None, get_quali=False, add_temp=True):
         net.eval()
         transformations = get_transformations(
             self.transform_names, split="test", sizes=(self.w_size, self.h_size)
         )
         pe_type = self._peco_dataset_type()
+        _w_dir = resolve_class_weights_dir(self.cfg, self.paths)
 
         if self.signal_type in "range_doppler":
-            sv_criterion = define_loss("range_doppler", self.custom_loss, self.device)
+            sv_criterion = define_loss(
+                "range_doppler",
+                self.custom_loss,
+                self.device,
+                weights_dir=_w_dir,
+                cfg=self.cfg,
+            )
         elif self.signal_type in "range_angle":
-            sv_criterion = define_loss("range_angle", self.custom_loss, self.device)
+            sv_criterion = define_loss(
+                "range_angle",
+                self.custom_loss,
+                self.device,
+                weights_dir=_w_dir,
+                cfg=self.cfg,
+            )
         else:
             raise ValueError(self.signal_type)
 
+        if not isinstance(sv_criterion, (list, tuple)):
+            sv_criterion = [sv_criterion]
         nb_losses = len(sv_criterion)
+        tvt_stats = resolve_tvt_stats_json_path(
+            self.signal_type, self.cfg, self.paths
+        )
         running_losses = []
         running_ce_losses = []
         running_dice_losses = []
+        running_track_losses = []
         sv_metrics = Evaluator(num_class=self.nb_classes)
         if iteration:
             rand_seq = np.random.randint(len(seq_loader))
@@ -112,6 +151,7 @@ class TesterSV:
                         self.cmplx_flag,
                         transformations,
                         add_temp,
+                        self.mulmask,
                     ),
                     shuffle=False,
                     batch_size=min(self.batch_size, 8),
@@ -125,43 +165,72 @@ class TesterSV:
                     if self.signal_type in "range_doppler":
                         sv_data = frame["rd_matrix"].to(self.device).float()
                         sv_mask = frame["rd_mask"].to(self.device).float()
-                        sv_data = normalize(sv_data, "range_doppler", norm_type=self.norm_type)
+                        sv_data = normalize(
+                            sv_data,
+                            "range_doppler",
+                            norm_type=self.norm_type,
+                            stats_json_path=tvt_stats,
+                        )
                     elif self.signal_type in "range_angle":
                         sv_data = frame["ra_matrix"].to(self.device).float()
                         sv_mask = frame["ra_mask"].to(self.device).float()
-                        sv_data = normalize(sv_data, "range_angle", norm_type=self.norm_type)
+                        sv_data = normalize(
+                            sv_data,
+                            "range_angle",
+                            norm_type=self.norm_type,
+                            stats_json_path=tvt_stats,
+                        )
                     else:
                         raise ValueError(self.signal_type)
 
-                    sv_outputs = net(sv_data)
+                    net_outputs = net(sv_data)
+                    if isinstance(net_outputs, (tuple, list)):
+                        sv_outputs = net_outputs[0]
+                        track_logits = net_outputs[1] if len(net_outputs) > 1 else None
+                    else:
+                        sv_outputs = net_outputs
+                        track_logits = None
                     sv_outputs = sv_outputs.to(self.device)
+                    if sv_mask.dim() == 5:
+                        tgt_idx = self._resolve_tgt_index(sv_mask.size(2), self.tgt)
+                        sv_tgt_mask = sv_mask[:, :, tgt_idx, :, :]
+                    else:
+                        sv_tgt_mask = sv_mask
                     if get_quali:
                         quali_iter_sv = get_qualitatives(
                             sv_outputs,
-                            sv_mask,
+                            sv_tgt_mask,
                             self.paths,
                             seq_name,
                             quali_iter_sv,
                             self.signal_type,
                         )
                     sv_metrics.add_batch(
-                        torch.argmax(sv_mask, axis=1).cpu(),
+                        torch.argmax(sv_tgt_mask, axis=1).cpu(),
                         torch.argmax(sv_outputs, axis=1).cpu(),
                     )
 
-                    if nb_losses < 3:
-                        sv_losses = [
-                            c(sv_outputs, torch.argmax(sv_mask, axis=1)) for c in sv_criterion
-                        ]
-                        loss = torch.mean(torch.stack(sv_losses))
+                    sv_losses = [
+                        c(sv_outputs, torch.argmax(sv_tgt_mask, axis=1)) for c in sv_criterion
+                    ]
+                    loss = torch.mean(torch.stack(sv_losses))
+                    if self.mulmask and sv_mask.dim() == 5 and track_logits is not None:
+                        track_gt = build_track_heatmap(
+                            sv_mask, gamma=self.track_gamma, use_history=True
+                        )
+                        track_pred = torch.sigmoid(track_logits)
+                        if track_pred.shape == track_gt.shape:
+                            track_loss = F.smooth_l1_loss(track_pred, track_gt)
+                            running_track_losses.append(float(track_loss.detach().cpu()))
 
                     running_losses.append(float(loss.detach().cpu()))
-                    running_ce_losses.append(float(sv_losses[0].detach().cpu()))
-                    running_dice_losses.append(float(sv_losses[1].detach().cpu()))
+                    if nb_losses > 1:
+                        running_ce_losses.append(float(sv_losses[0].detach().cpu()))
+                        running_dice_losses.append(float(sv_losses[1].detach().cpu()))
 
                     if iteration and i == rand_seq and j == rand_frame:
                         sv_pred_masks = torch.argmax(sv_outputs, axis=1)[:5]
-                        sv_gt_masks = torch.argmax(sv_mask, axis=1)[:5]
+                        sv_gt_masks = torch.argmax(sv_tgt_mask, axis=1)[:5]
                         sv_pred_grid = make_grid(
                             transform_masks_viz(sv_pred_masks, self.nb_classes)
                         )
@@ -175,23 +244,27 @@ class TesterSV:
 
             self.test_results = dict()
             mean_loss = float(np.mean(running_losses)) if running_losses else 0.0
-            mean_ce = float(np.mean(running_ce_losses)) if running_ce_losses else 0.0
-            mean_dice = float(np.mean(running_dice_losses)) if running_dice_losses else 0.0
             loss_tensor = torch.tensor(mean_loss)
-            ce_tensor = torch.tensor(mean_ce)
-            dice_tensor = torch.tensor(mean_dice)
+            if nb_losses > 1:
+                mean_ce = float(np.mean(running_ce_losses)) if running_ce_losses else 0.0
+                mean_dice = float(np.mean(running_dice_losses)) if running_dice_losses else 0.0
+                loss_parts = [torch.tensor(mean_ce), torch.tensor(mean_dice)]
+            else:
+                loss_parts = None
             if self.signal_type in "range_doppler":
                 self.test_results["range_doppler"] = get_metrics(
                     sv_metrics,
                     loss_tensor,
-                    [ce_tensor, dice_tensor],
+                    loss_parts,
                 )
             elif self.signal_type in "range_angle":
                 self.test_results["range_angle"] = get_metrics(
                     sv_metrics,
                     loss_tensor,
-                    [ce_tensor, dice_tensor],
+                    loss_parts,
                 )
+            if running_track_losses:
+                self.test_results["track_loss"] = float(np.mean(running_track_losses))
             sv_metrics.reset()
         return self.test_results
 

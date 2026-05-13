@@ -135,6 +135,7 @@ class TFocConvV1(nn.Module):
         self.k_n = int(search_size)
         self.pad_size = math.floor(self.k_n / 2)
         self.attn_temperature = float(attn_temperature)
+        self.tgt_index = -1
 
         self.spatial_conv = Double3DConvBlock(
             in_ch,
@@ -170,15 +171,37 @@ class TFocConvV1(nn.Module):
         self._grid_center_cache = {}
         self._grid_local_cache = {}
 
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+
+    @staticmethod
+    def _resolve_tgt_index(t: int, tgt_index: int) -> int:
+        """Resolve possibly-negative tgt_index into [0, t-1] (like Python indexing)."""
+        if t <= 0:
+            return 0
+        idx = int(tgt_index)
+        if idx < 0:
+            idx = t + idx
+        if idx < 0:
+            idx = 0
+        if idx > t - 1:
+            idx = t - 1
+        return idx
+
     def forward(self, x_seq: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         x_seq = self.spatial_conv(x_seq)
         b, c, t, h, w = x_seq.shape
         device = x_seq.device
         n = self.k_n * self.k_n
 
-        x_tgt_ori = x_seq[:, :, -1, :, :].unsqueeze(2)
+        tgt_i = self._resolve_tgt_index(t, self.tgt_index)
+        x_tgt_ori = x_seq[:, :, tgt_i, :, :].unsqueeze(2)
         x_tgt_rep = x_tgt_ori.expand(-1, -1, t - 1, -1, -1)
-        x_hst = self.tfoc_prepadding(x_seq[:, :, : t - 1, :, :])
+        if t <= 1:
+            raise ValueError("TFocConvV1 expects at least 2 frames in time dimension.")
+        # History frames are all remaining time steps (exclude tgt), keep original time order.
+        hist_idx = [ti for ti in range(t) if ti != tgt_i]
+        x_hst = self.tfoc_prepadding(x_seq[:, :, hist_idx, :, :])
 
         p_hst = self._gen_global_sample_grid(b, h, w, n, device=device)
 
@@ -287,6 +310,11 @@ class EncodingBranch(nn.Module):
             search_size=5,
             attn_temperature=1.0,
         )
+        self.tgt_index = -1
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.tfoc_conv_block.set_tgt_index(self.tgt_index)
 
         self.doppler_max_pool = nn.MaxPool2d(2, stride=(2, 1))
         self.max_pool = nn.MaxPool2d(2, stride=2)
@@ -341,6 +369,7 @@ class TFocNet(nn.Module):
         self.rd_encoding_branch = EncodingBranch("range_doppler", self.n_frames)
         self.ra_encoding_branch = EncodingBranch("range_angle", self.n_frames)
         self.ad_encoding_branch = EncodingBranch("angle_doppler", self.n_frames)
+        self.tgt_index = -1
 
         self.rd_aspp_block = ASPPBlock(in_ch=128, out_ch=128)
         self.ra_aspp_block = ASPPBlock(in_ch=128, out_ch=128)
@@ -376,6 +405,12 @@ class TFocNet(nn.Module):
         self.ra_double_conv_block2_prb = DoubleConvBlock(in_ch=32, out_ch=32, k_size=3, pad=1, dil=1)
         self.rd_final_prb = nn.Conv2d(in_channels=32, out_channels=n_classes, kernel_size=1, padding=0)
         self.ra_final_prb = nn.Conv2d(in_channels=32, out_channels=n_classes, kernel_size=1, padding=0)
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.rd_encoding_branch.set_tgt_index(self.tgt_index)
+        self.ra_encoding_branch.set_tgt_index(self.tgt_index)
+        self.ad_encoding_branch.set_tgt_index(self.tgt_index)
 
     def forward(
         self,

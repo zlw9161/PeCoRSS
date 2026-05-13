@@ -119,6 +119,7 @@ class TFocConvV2Revise(nn.Module):
         self.topk_temperature = float(topk_temperature)
         self.metric_fg_weight = float(metric_fg_weight)
         self.use_straight_through_khot = bool(use_straight_through_khot)
+        self.tgt_index = -1
 
         self.debug_cuda = os.environ.get("TFOC_DEBUG_CUDA", "0") == "1"
         self.debug_strict_index = os.environ.get("TFOC_DEBUG_STRICT_INDEX", "0") == "1"
@@ -132,6 +133,22 @@ class TFocConvV2Revise(nn.Module):
         )
         self._grid_center_cache = {}
         self._grid_local_cache = {}
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+
+    @staticmethod
+    def _resolve_tgt_index(t: int, tgt_index: int) -> int:
+        if t <= 0:
+            return 0
+        idx = int(tgt_index)
+        if idx < 0:
+            idx = t + idx
+        if idx < 0:
+            idx = 0
+        if idx > t - 1:
+            idx = t - 1
+        return idx
 
     def _debug_check_index(self, idx: torch.Tensor, max_inclusive: int, name: str) -> None:
         if not self.debug_cuda:
@@ -149,7 +166,8 @@ class TFocConvV2Revise(nn.Module):
         n = self.k_n * self.k_n
         k = max(1, min(self.topk, n))
 
-        x_tgt_ori = x_seq[:, :, -1, :, :].unsqueeze(2)
+        tgt_i = self._resolve_tgt_index(t, self.tgt_index)
+        x_tgt_ori = x_seq[:, :, tgt_i, :, :].unsqueeze(2)
         x_tgt_cand = x_tgt_ori.expand(-1, -1, t - 1, -1, -1).unsqueeze(-1).expand(-1, -1, -1, -1, -1, n)
         x_hst = self.tfoc_prepadding(x_seq[:, :, : t - 1, :, :])
         p_hst = self._gen_global_sample_grid(b, h, w, n, x_seq.device)
@@ -252,6 +270,7 @@ class EncodingBranch(nn.Module):
         self.signal_type = signal_type
         self.double_3d_conv_block = Double3DConvBlock(1, 64, (3, 3, 3), (1, 1, 1), (0, 1, 1), 1)
         self.tfoc_conv_block = TFocConvV2Revise(64, 128, 8, 5, 3, 0.7, 0.5)
+        self.tgt_index = -1
         self.doppler_max_pool = nn.MaxPool2d(2, stride=(2, 1))
         self.max_pool = nn.MaxPool2d(2, stride=2)
         self.single_conv_block1_3x3 = ConvBlock(128, 128, 3, 1, 1)
@@ -260,6 +279,10 @@ class EncodingBranch(nn.Module):
         self.single_conv_block1_3x3_prb = ConvBlock(4, 32, 3, 1, 1)
         self.single_conv_block2_3x3_prb = ConvBlock(32, 32, 3, 1, 1)
         self.single_conv_block1_1x1_prb = ConvBlock(32, 32, 1, 0, 1)
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.tfoc_conv_block.set_tgt_index(self.tgt_index)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         x0 = self.double_3d_conv_block(x)
@@ -293,6 +316,13 @@ class TFocNet(nn.Module):
         self.rd_encoding_branch = EncodingBranch("range_doppler", self.n_frames)
         self.ra_encoding_branch = EncodingBranch("range_angle", self.n_frames)
         self.ad_encoding_branch = EncodingBranch("angle_doppler", self.n_frames)
+        self.tgt_index = -1
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.rd_encoding_branch.set_tgt_index(self.tgt_index)
+        self.ra_encoding_branch.set_tgt_index(self.tgt_index)
+        self.ad_encoding_branch.set_tgt_index(self.tgt_index)
 
         self.rd_aspp_block = ASPPBlock(128, 128)
         self.ra_aspp_block = ASPPBlock(128, 128)

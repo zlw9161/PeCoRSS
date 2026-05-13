@@ -165,6 +165,23 @@ class TFocConv(nn.Module):
             TREBlock(out_ch, out_ch, k_size=(1, 1, 1), strd=(1, 1, 1), pad=(0, 0, 0)),
         )
         #self.tfoc_postpadding = nn.ReplicationPad3d((2, 2, 2, 2, 0, 0))  # zlw@20230816
+        self.tgt_index = -1
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+
+    @staticmethod
+    def _resolve_tgt_index(t: int, tgt_index: int) -> int:
+        if t <= 0:
+            return 0
+        idx = int(tgt_index)
+        if idx < 0:
+            idx = t + idx
+        if idx < 0:
+            idx = 0
+        if idx > t - 1:
+            idx = t - 1
+        return idx
 
 
     def forward(self, x_seq): #x_mask(b,c,t,h,w)
@@ -176,7 +193,8 @@ class TFocConv(nn.Module):
 
         # 1 extract x_tgt, repeat t-1 times in time dim and padding
         ###########!!!!!!chose the location of x_tgt!!!!!!!!!##############
-        x_tgt_ori = x_seq[:, :, -1, :, :]  # (b,c,h,w)
+        tgt_i = self._resolve_tgt_index(t, self.tgt_index)
+        x_tgt_ori = x_seq[:, :, tgt_i, :, :]  # (b,c,h,w)
         #x_tgt_ori = x_seq[:, :, int((t - 1) / 2), :, :]  # (b,c,h,w)
         ###################################################################
         x_tgt_ori = torch.unsqueeze(x_tgt_ori, 2)  # (b,c,1,h,w)
@@ -325,6 +343,7 @@ class EncodingBranch(nn.Module):
                                         out_ch=128,
                                         btnk_ch=8, #out_ch/btnk_sc
                                         search_size=self.search_size)
+        self.tgt_index = -1
         self.doppler_max_pool = nn.MaxPool2d(2, stride=(2, 1))
         self.max_pool = nn.MaxPool2d(2, stride=2)
         self.single_conv_block1_3x3 = ConvBlock(in_ch=128, out_ch=128, k_size=3, pad=1, dil=1)
@@ -333,6 +352,10 @@ class EncodingBranch(nn.Module):
         self.single_conv_block1_3x3_prb = ConvBlock(in_ch=4, out_ch=32, k_size=3, pad=1, dil=1)
         self.single_conv_block2_3x3_prb = ConvBlock(in_ch=32, out_ch=32, k_size=3, pad=1, dil=1)
         self.single_conv_block1_1x1_prb = ConvBlock(in_ch=32, out_ch=32, k_size=1, pad=0, dil=1)
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.tfoc_conv_block.set_tgt_index(self.tgt_index)
 
     def forward(self, x):
         x0 = self.double_3d_conv_block(x)  # [b,128,(n_frames-3+1-3+1),h,w]
@@ -397,12 +420,19 @@ class TFocNet(nn.Module):
         self.zero_doppler_filter = zero_doppler_filter
         self.search_size_rd = search_size[0]
         self.search_size_ra = search_size[1]
+        self.tgt_index = -1
 
 
         # Backbone (encoding)
         self.rd_encoding_branch = EncodingBranch('range_doppler', self.n_frames, self.search_size_rd)
         self.ra_encoding_branch = EncodingBranch('range_angle', self.n_frames, self.search_size_ra)
         self.ad_encoding_branch = EncodingBranch('angle_doppler', self.n_frames, self.search_size_rd)
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.rd_encoding_branch.set_tgt_index(self.tgt_index)
+        self.ra_encoding_branch.set_tgt_index(self.tgt_index)
+        self.ad_encoding_branch.set_tgt_index(self.tgt_index)
 
         # ASPP Blocks
         self.rd_aspp_block = ASPPBlock(in_ch=128, out_ch=128)

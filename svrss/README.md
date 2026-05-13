@@ -1,45 +1,109 @@
-# SVRSS (T-Foc / SV branch)
+# PeakConv: Learning Peak Receptive Field for Radar Semantic Segmentation
 
-本目录整理的是 **SVRSS** 方向的一套“干净可运行”代码（以 `train_ddp_sv.py` 为训练入口，支持 DDP）。
+## Paper
 
-## 算法简介
+![teaser_schema](./images/prf.png)
 
-SVRSS 面向单视图（Single-View）的雷达语义分割训练/评估流水线。整体结构沿用“配置驱动 + 数据加载器 + 模型构建 + 训练器（含 DDP）”的工程化组织方式，便于替换不同的 `tfoc_ultra_sv*` 模型变体与配置文件。
+[PeakConv: Learning Peak Receptive Field for Radar Semantic Segmentation], CVPR 2023, under-review.
 
-## 算法构成
+[Liwen Zhang](https://github.com/zlw9161)
 
-- **训练入口**
-  - `train_ddp_sv.py`: DDP/SyncBN 训练入口（本仓库默认使用该入口）
-- **配置**
-  - `config_files/`: 训练/测试配置（JSON）
-- **训练逻辑**
-  - `learners/initializer_ddp_sv.py`: DDP 训练的实验目录/数据加载初始化
-  - `learners/model_ddp_sv.py`: DDP 训练主循环（日志、验证、保存等）
-- **数据**
-  - `loaders/dataloaders_sv.py`: SV 数据集与 dataloader
-- **模型**
-  - `models/`、`models_3D/`: `tfoc_ultra_sv*` 系列网络实现
-- **工具**
-  - `utils/`: 常用函数（归一化、loss、可视化等）
+This repository groups the implemetations of the PeakConv RSS-Net.
 
-## 训练命令
+The models are trained and tested on the [CARRADA dataset](https://arxiv.org/abs/2005.01456).
 
-README 中训练命令按照你指定的 tmux 格式给出（注意：入口脚本为 `train_ddp_sv.py`）：
+The CARRADA dataset is available on Arthur Ouaknine's personal web page at this link: [https://arthurouaknine.github.io/codeanddata/carrada](https://arthurouaknine.github.io/codeanddata/carrada).
 
-```bash
-tmux new -d -s tfoc_sv_rd 'bash -lc "
-cd \"/media/ycc/4TB/PaperWork/TFocNet/T-Foc/svrss\" &&
-mkdir -p logs &&
-TS=\$(date +%Y%m%d_%H%M%S) &&
-CUDA_VISIBLE_DEVICES=0 PYTHONPATH=.. \
-conda run --no-capture-output -n t-foc \
-torchrun --standalone --nproc_per_node 1 train_ddp_sv.py --cfg config_files/tfoc_sv_ddp_rd.json --no-sync-bn \
-> >(tee \"logs/ddp_sv_v1_revise_rd_\${TS}.out.log\") \
-2> >(tee \"logs/ddp_sv_v1_revise_rd_\${TS}.err.log\" >&2)
-"'
+If you find this code useful for your research, please cite [our paper](https://arxiv.org/abs/2103.16214):
+```
+@InProceedings{zlw_2022_pkc,
+	       author = {Liwen, Zhang and Xinyan, Zhang and Youcheng, Zhang and Yufei, Guo and Yuanpei, Chen},
+	       title = {PeakConv: Learning Peak Receptive Field for Radar Semantic Segmentation},
+	       booktitle = {CVPR 2023 submitted},
+	       month = {November},
+	       year = {2022}
+	       }
+```
+![Vanilla-PKC](./images/vanilla.png)
+![ReDA-PKC](./images/reda.png)
+## Installation with Docker
+
+It is strongly recommanded to use Docker with the provided [Dockerfile](./Dockerfile) containing all the dependencies.
 ```
 
-## 备注
+1. Create the Docker image:
+```bash
+$ cd PKC/
+$ docker build . -t "pkc:Dockerfile"
+```
 
-- 若你的数据路径依赖 `utils/paths.py` 或配置里的路径字段，请先按你本机路径完成一次配置（否则 dataloader 会找不到数据）。
-- DDP 模式下建议使用 `torchrun` 启动，并确保 `CUDA_VISIBLE_DEVICES` 与 `--nproc_per_node` 对应。
+**Note**: The CARRADA dataset used for train and test is considered as already downloaded by default. If it is not the case, you can uncomment the corresponding command lines in the [Dockerfile](./Dockerfile) or follow the guidelines of the dedicated [repository](https://github.com/valeoai/carrada_dataset).
+
+2. Run a container and join an interactive session. Note that the option `-v /host_path:/local_path` is used to mount a volume (corresponding to a shared memory space) between the host machine and the Docker container and to avoid copying data (logs and datasets). You will be able to run the code on this session:
+```bash
+$ docker run -d --ipc=host -it -v /host_machine_path/datasets:/home/datasets_local -v /host_machine_path/logs:/home/logs --name pkc --gpus all pkc:Dockerfile sleep infinity
+$ docker exec -it pkc bash
+```
+
+
+## Installation without Docker
+
+You can either use Docker with the provided [Dockerfile](./Dockerfile) containing all the dependencies, or follow these steps.
+
+1. Install this repository using pip:
+```bash
+$ cd PKC/
+$ pip install -e .
+```
+With this, you can edit the PKC code on the fly and import function and classes of PKC in other project as well.
+
+2. Install all the dependencies using pip and conda, please take a look at the [Dockerfile](./Dockerfile) for the list and versions of the dependencies.
+
+3. Optional. To uninstall this package, run:
+```bash
+$ pip uninstall PKC
+```
+
+You can take a look at the [Dockerfile](./Dockerfile) if you are uncertain about steps to install this project.
+
+
+## Running the code
+
+In any case, it is **mandatory** to specify beforehand both the path where the CARRADA dataset is located and the path to store the logs and models. Example: I put the Carrada folder in /home/datasets_local, the path I should specify is /home/datasets_local. The same way if I store my logs in /home/logs. Please run the following command lines while adapting the paths to your settings:
+
+```bash
+$ cd PKC/mvrss/utils/
+$ python set_paths.py --carrada /home/datasets_local --logs /home/logs
+```
+
+### Training
+
+In order to train a model, a JSON configuration file should be set. The configuration file corresponding to the selected parameters to train the TMVA-Net architecture is provided here: `MVRSS/mvrss/config_files/tmvanet.json`. To train the TMVA-Net architecture, please run the following command lines:
+
+```bash
+$ cd PKC/mvrss/
+$ python train.py --cfg config_files/pkcin.json
+```
+
+If you want to train the MV-Net architecture (baseline), please use the corresponding configuration file: `mvnet.json`.
+
+### Testing
+
+To test a recorded model, you should specify the path to the configuration file recorded in your log folder during training. Per example, if you want to test a model and your log path has been set to `/home/logs`, you should specify the following path: `/home/logs/carrada/tmvanet/name_of_the_model/config.json`. This way, you should execute the following command lines:
+
+```bash
+$ cd PKC/mvrss/
+$ python test.py --cfg /home/logs/carrada/pkcin/name_of_the_model/config.json
+```
+Note: the current implementation of this script will generate qualitative results in your log folder. You can disable this behavior by setting `get_quali=False` in the parameters of the `predict()` method of the `Tester()` class.
+
+
+## Acknowledgements
+- The paper is under review, special thanks will be indicated after the final results
+- The Soft Dice loss is based on the code from <https://github.com/kornia/kornia/blob/master/kornia/losses/dice.py>
+- Thank [CARRADA dataset](https://arxiv.org/abs/2005.01456) for providing the Radar dataset.
+- Thank [MVRSS](https://arxiv.org/abs/2103.16214) for providing the basic model framework of multi-view RSS network. And we build our model using the basic framework of `mvrss` lib, our incremental modifications to the  `mvrss` code did not effect the TMVA-Net and MV-Net in MVRSS. 
+- The paper is submitted to CVPR 2023, other special thanks will be mentioned after the final results.
+
+## License
+The PKC repo is released under the Apache 2.0 license.

@@ -1,11 +1,14 @@
 """A lot of functions used in our pipelines"""
 import json
+import warnings
+from pathlib import Path
+
 import numpy as np
 import torch
 import torch.nn as nn
 from PIL import Image
 
-from svrss.utils import MVRSS_HOME
+from svrss.utils import SVRSS_HOME
 from svrss.losses.soft_dice import SoftDiceLoss
 from svrss.losses.coherence import CoherenceLoss
 from svrss.losses.soft_coherence import SoftCoherenceLoss
@@ -13,34 +16,275 @@ from svrss.losses.sparse_coherence import SparseCoherenceLoss
 from svrss.losses.smospa_coherence import SmoSpaCoherenceLoss
 from svrss.losses.distribution_coherence import DistributionCoherenceLoss
 from svrss.losses.denoise_coherence import DenoiseCoherenceLoss
-from svrss.loaders.dataloaders_mm import Rescale, Flip, HFlip, VFlip
+from svrss.loaders.dataloaders_sv import Rescale, Flip, HFlip, VFlip
+
+# Class index order must match segmentation mask ids used in training / CE.
+CARRADA_CLASS_WEIGHT_KEYS = ('background', 'pedestrian', 'cyclist', 'car')
+# Official KuRALS keys (kurals/utils/functions.py, KuRALS_CW / KuRALS_PD).
+KURALS_CW_CLASS_WEIGHT_KEYS = ('Background', 'UAV', 'Pedestrian', 'Vehicle')
+KURALS_PD_CLASS_WEIGHT_KEYS = ('Background', 'UAV', 'Pedestrian', 'Car', 'Boat')
 
 
-def get_class_weights(signal_type):
+def build_track_heatmap(mask_seq: torch.Tensor, gamma: float = 0.9, use_history: bool = True) -> torch.Tensor:
+    """Build a per-class temporal track heatmap from one-hot masks.
+
+    Parameters
+    ----------
+    mask_seq: torch.Tensor
+        Shape ``(B, C, T, H, W)``.
+    gamma: float
+        Temporal decay in ``(0, 1]``. Recent frames have larger weights.
+    use_history: bool
+        When True, use frames ``[0..T-2]`` to supervise the target frame ``T-1``.
+    """
+    if mask_seq.dim() != 5:
+        raise ValueError(
+            f"mask_seq must be 5D (B,C,T,H,W), got shape {tuple(mask_seq.shape)}"
+        )
+
+    _, c, t, _, _ = mask_seq.shape
+    if t < 2 and use_history:
+        raise ValueError("Need at least 2 frames to build history track heatmap.")
+
+    k = int(t - 1 if use_history else t)
+    masks = mask_seq[:, :, :k, :, :].float()
+    device = masks.device
+
+    exponents = torch.arange(k - 1, -1, -1, device=device, dtype=masks.dtype)
+    gamma_t = torch.tensor(float(gamma), device=device, dtype=masks.dtype)
+    weights = torch.pow(gamma_t, exponents)
+    weights = weights / (weights.sum() + 1e-8)
+    weights = weights.view(1, 1, k, 1, 1)
+
+    heat = torch.sum(masks * weights, dim=2)
+    heat = torch.clamp(heat, 0.0, 1.0)
+
+    if c >= 2:
+        fg = heat[:, 1:, :, :]
+        bg = 1.0 - torch.max(fg, dim=1, keepdim=True).values
+        heat = torch.cat([torch.clamp(bg, 0.0, 1.0), fg], dim=1)
+
+    return heat
+
+
+def class_weight_keys_for_cfg(cfg):
+    """JSON key order for `rd_weights.json` / `ra_weights.json` tensors."""
+    if cfg is None:
+        return CARRADA_CLASS_WEIGHT_KEYS
+    override = cfg.get('class_weight_keys')
+    if override:
+        return tuple(override)
+
+    dl = (cfg.get('dataset') or '').strip().lower()
+    if dl in ('cwr', 'cwrdata'):
+        return KURALS_CW_CLASS_WEIGHT_KEYS
+    if dl in ('pdr', 'pdrdata'):
+        return KURALS_PD_CLASS_WEIGHT_KEYS
+    return CARRADA_CLASS_WEIGHT_KEYS
+
+
+def _weight_json_lookup(wdict, canon_key):
+    """Resolve a weight entry; dataset files may mix ``background`` vs ``Background``."""
+    if canon_key in wdict:
+        return wdict[canon_key]
+    lk = canon_key.lower()
+    for jk, v in wdict.items():
+        if str(jk).lower() == lk:
+            return v
+    return None
+
+
+def _class_weight_vec_for_keys(wdict, keys):
+    """Build weight vector if every key resolves; else ``(None, None)``."""
+    vals = [_weight_json_lookup(wdict, k) for k in keys]
+    if all(v is not None for v in vals):
+        return np.array(vals, dtype=np.float64), keys
+    return None, None
+
+
+def _class_weight_vec_from_json(wdict, cfg):
+    """Pick key order compatible with loaded JSON (KuRALS vs legacy Carrada names)."""
+    keys = class_weight_keys_for_cfg(cfg)
+    vec, used = _class_weight_vec_for_keys(wdict, keys)
+    if vec is not None:
+        return vec, used
+
+    dl = '' if cfg is None else (cfg.get('dataset') or '').strip().lower()
+    if dl in ('cwr', 'cwrdata', 'pdr', 'pdrdata') and all(
+            _weight_json_lookup(wdict, k) is not None for k in CARRADA_CLASS_WEIGHT_KEYS):
+        if dl in ('pdr', 'pdrdata'):
+            raise KeyError(
+                'KuRALS-PD expects five weight keys {}; found only Carrada-style keys {}'
+                .format(list(class_weight_keys_for_cfg(cfg)),
+                        list(CARRADA_CLASS_WEIGHT_KEYS))
+            )
+        warnings.warn(
+            'Using Carrada-named keys in rd/ra_weights.json for KuRALS-CW '
+            '(background, pedestrian, cyclist, car). Prefer official KuRALS keys '
+            '(Background, UAV, Pedestrian, Vehicle).',
+            UserWarning,
+            stacklevel=2,
+        )
+        return (
+            np.array([_weight_json_lookup(wdict, k) for k in CARRADA_CLASS_WEIGHT_KEYS],
+                     dtype=np.float64),
+            CARRADA_CLASS_WEIGHT_KEYS,
+        )
+
+    missing = [k for k in keys if _weight_json_lookup(wdict, k) is None]
+    raise KeyError(
+        'Class weight JSON missing keys {} (expected {}). Keys present: {}'.format(
+            missing, list(keys), list(wdict.keys())
+        )
+    )
+
+
+def resolve_class_weights_dir(cfg, paths):
+    """Prefer dataset-root or explicit cfg weights (e.g. CWR KuCW/rd_weights.json).
+
+    PARAMETERS
+    ----------
+    cfg: dict
+        May set ``class_weights_dir`` / ``weights_json_dir`` (directory holding
+        rd_weights.json or ra_weights.json).
+    paths: dict
+        Paths from Paths().get() (e.g. CWRdata, PDRdata).
+
+    RETURNS
+    -------
+    pathlib.Path | None
+        Directory to load weights from, or None to use repo ``config_files/``.
+    """
+    st = cfg.get('signal_type', '')
+    if st == 'range_angle':
+        file_name = 'ra_weights.json'
+    elif st == 'range_doppler':
+        file_name = 'rd_weights.json'
+    else:
+        return None
+
+    cd = cfg.get('class_weights_dir') or cfg.get('weights_json_dir')
+    if cd:
+        root = Path(cd).expanduser()
+        if (root / file_name).is_file():
+            return root
+
+    dl = (cfg.get('dataset') or '').strip().lower()
+    if dl in ('cwr', 'cwrdata'):
+        root = paths.get('CWRdata')
+    elif dl in ('pdr', 'pdrdata'):
+        root = paths.get('PDRdata')
+    else:
+        root = None
+    if root is not None:
+        root = Path(root)
+        if (root / file_name).is_file():
+            return root
+    return None
+
+
+def resolve_tvt_stats_json_path(signal_type, cfg, paths):
+    """Resolve ``*_stats_all.json`` for ``normalize(..., tvt)``.
+
+    Order: ``cfg['norm_stats_dir']`` / ``cfg['stats_json_dir']`` → same directory as
+    class weights (if ``rd_weights.json`` exists) → CWR/PDR dataset root from ``paths``
+    even when weight files are missing. Without a match, ``normalize`` falls back to
+    ``svrss/config_files/*_stats_all.json`` (Carrada-scale), which breaks KuPD inputs in
+    ``[0, 1]``.
+    """
+    if cfg is None or paths is None:
+        return None
+    if signal_type == 'range_angle':
+        name = 'ra_stats_all.json'
+    elif signal_type == 'range_doppler':
+        name = 'rd_stats_all.json'
+    elif signal_type == 'angle_doppler':
+        name = 'ad_stats_all.json'
+    else:
+        return None
+
+    nd = cfg.get('norm_stats_dir') or cfg.get('stats_json_dir')
+    if nd:
+        p = Path(nd).expanduser() / name
+        if p.is_file():
+            return p
+
+    wd = resolve_class_weights_dir(cfg, paths)
+    if wd is not None:
+        p = Path(wd) / name
+        if p.is_file():
+            return p
+
+    dl = (cfg.get('dataset') or '').strip().lower()
+    root = None
+    if dl in ('cwr', 'cwrdata'):
+        root = paths.get('CWRdata')
+    elif dl in ('pdr', 'pdrdata'):
+        root = paths.get('PDRdata')
+    if root is not None:
+        p = Path(root) / name
+        if p.is_file():
+            return p
+    return None
+
+
+def resolved_class_weights_json_path(signal_type, cfg, paths):
+    """Return the absolute JSON path loaded for weighted CE given cfg and Paths()."""
+    wd = resolve_class_weights_dir(cfg, paths)
+    return _class_weights_json_path(signal_type, weights_dir=wd).resolve()
+
+
+def _class_weights_json_path(signal_type, weights_dir=None):
+    if signal_type in ('range_angle',):
+        file_name = 'ra_weights.json'
+    elif signal_type in ('range_doppler',):
+        file_name = 'rd_weights.json'
+    else:
+        raise ValueError('Signal type {} is not supported.'.format(signal_type))
+
+    fallback = SVRSS_HOME / 'config_files' / file_name
+
+    if weights_dir is None:
+        return fallback
+
+    p = Path(weights_dir).expanduser() / file_name
+    return p if p.is_file() else fallback
+
+
+def get_class_weights(signal_type, weights_dir=None, cfg=None):
     """Load class weights for custom loss
 
     PARAMETERS
     ----------
     signal_type: str
         Supported: 'range_doppler', 'range_angle'
+    weights_dir: str | pathlib.Path | None
+        If given and contains the matching ``*_weights.json``, use it; else
+        ``svrss/config_files``.
+    cfg: dict | None
+        Used to pick JSON key order: Carrada vs KuRALS-CW vs KuRALS-PD (see
+        ``class_weight_keys_for_cfg``). Optional ``class_weight_keys`` in cfg
+        overrides the default list.
 
     RETURNS
     -------
-    weights: numpy array
+    weights: torch.Tensor
     """
-    weight_path = MVRSS_HOME / 'config_files'
-    if signal_type in ('range_angle'):
-        file_name = 'ra_weights.json'
-    elif signal_type in ('range_doppler'):
-        file_name = 'rd_weights.json'
-    else:
-        raise ValueError('Signal type {} is not supported.'.format(signal_type))
-    file_path = weight_path / file_name
+    file_path = _class_weights_json_path(signal_type, weights_dir=weights_dir)
     with open(file_path, 'r') as fp:
-        weights = json.load(fp)
-    weights = np.array([weights['background'], weights['pedestrian'],
-                        weights['cyclist'], weights['car']])
-    weights = torch.from_numpy(weights)
+        wdict = json.load(fp)
+
+    vec, used_keys = _class_weight_vec_from_json(wdict, cfg)
+
+    if cfg is not None:
+        nb = cfg.get('nb_classes')
+        if nb is not None and int(nb) != len(used_keys):
+            raise ValueError(
+                'nb_classes={} does not match weight key count {} for dataset/class_weight_keys'
+                .format(nb, len(used_keys))
+            )
+
+    weights = torch.from_numpy(vec)
     return weights
 
 # zlw@20220302 Balance the RD and RA Losses
@@ -88,7 +332,7 @@ def get_metrics(metrics, loss, losses=None):
     """
     metrics_values = dict()
     metrics_values['loss'] = loss.item()
-    if isinstance(losses, list):
+    if isinstance(losses, list) and len(losses) > 1:
         metrics_values['loss_ce'] = losses[0].item()
         metrics_values['loss_dice'] = losses[1].item()
     acc, acc_by_class = metrics.get_pixel_acc_class()  # harmonic_mean=True)
@@ -109,7 +353,7 @@ def get_metrics(metrics, loss, losses=None):
     return metrics_values
 
 
-def normalize(data, signal_type, norm_type='local'):
+def normalize(data, signal_type, norm_type='local', stats_json_path=None):
     """
     Method to normalise the radar views
 
@@ -123,6 +367,10 @@ def normalize(data, signal_type, norm_type='local'):
     norm_type: str
         Type of normalisation to apply
         Supported: 'local', 'tvt'
+    stats_json_path: str | pathlib.Path | None
+        For ``norm_type=='tvt'``, optional JSON with ``min_val`` / ``max_val``
+        (e.g. PDR/CWR dataset ``rd_stats_all.json``). If ``None`` or missing,
+        falls back to ``svrss/config_files/*_stats_all.json``.
 
     RETURNS
     -------
@@ -132,12 +380,21 @@ def normalize(data, signal_type, norm_type='local'):
     if norm_type in ('local'):
         min_value = torch.min(data)
         max_value = torch.max(data)
-        norm_data = torch.div(torch.sub(data, min_value), torch.sub(max_value, min_value))
+        denom = torch.sub(max_value, min_value)
+        # Avoid NaN when the tensor is constant (e.g. empty crop).
+        denom = torch.where(
+            denom.abs() < 1e-12,
+            torch.ones_like(denom),
+            denom,
+        )
+        norm_data = torch.div(torch.sub(data, min_value), denom)
         return norm_data
 
     elif signal_type == 'range_doppler':
         if norm_type == 'tvt':
-            file_path = MVRSS_HOME / 'config_files' / 'rd_stats_all.json'
+            file_path = Path(stats_json_path) if stats_json_path else None
+            if file_path is None or not file_path.is_file():
+                file_path = SVRSS_HOME / 'config_files' / 'rd_stats_all.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
@@ -147,7 +404,9 @@ def normalize(data, signal_type, norm_type='local'):
 
     elif signal_type == 'range_angle':
         if norm_type == 'tvt':
-            file_path = MVRSS_HOME / 'config_files' / 'ra_stats_all.json'
+            file_path = Path(stats_json_path) if stats_json_path else None
+            if file_path is None or not file_path.is_file():
+                file_path = SVRSS_HOME / 'config_files' / 'ra_stats_all.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
@@ -157,7 +416,9 @@ def normalize(data, signal_type, norm_type='local'):
 
     elif signal_type == 'angle_doppler':
         if norm_type == 'tvt':
-            file_path = MVRSS_HOME / 'config_files' / 'ad_stats_all.json'
+            file_path = Path(stats_json_path) if stats_json_path else None
+            if file_path is None or not file_path.is_file():
+                file_path = SVRSS_HOME / 'config_files' / 'ad_stats_all.json'
         else:
             raise TypeError('Global type {} is not supported'.format(norm_type))
         with open(file_path, 'r') as fp:
@@ -168,12 +429,19 @@ def normalize(data, signal_type, norm_type='local'):
     else:
         raise TypeError('Signal {} is not supported.'.format(signal_type))
 
-    norm_data = torch.div(torch.sub(data, min_value),
-                          torch.sub(max_value, min_value))
+    denom = torch.sub(max_value, min_value)
+    if not torch.is_tensor(denom):
+        denom = torch.tensor(denom)
+    denom = torch.where(
+        denom.abs() < 1e-12,
+        torch.ones_like(denom),
+        denom,
+    )
+    norm_data = torch.div(torch.sub(data, min_value), denom)
     return norm_data
 
 
-def define_loss(signal_type, custom_loss, device):
+def define_loss(signal_type, custom_loss, device, weights_dir=None, cfg=None):
     """
     Method to define the loss to use during training
 
@@ -188,23 +456,31 @@ def define_loss(signal_type, custom_loss, device):
         Default: Cross Entropy is used for any other str
     devide: str
         Supported: 'cuda' or 'cpu'
+    weights_dir: str | pathlib.Path | None
+        Optional directory with ``rd_weights.json`` / ``ra_weights.json`` (see
+        ``resolve_class_weights_dir``).
+    cfg: dict | None
+        Training / inference config for class-weight key ordering (KuRALS vs Carrada).
     """
+    kw = {'weights_dir': weights_dir, 'cfg': cfg}
     if custom_loss == 'wce':
-        weights = get_class_weights(signal_type)
+        weights = get_class_weights(signal_type, **kw)
         loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
     elif custom_loss == 'sdice':
         loss = SoftDiceLoss()
     elif custom_loss == 'wce_w10sdice':
-        weights = get_class_weights(signal_type)
+        weights = get_class_weights(signal_type, **kw)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, SoftDiceLoss(global_weight=10.)]
     elif custom_loss == 'wce_w10sdice_w5col':
         weights = get_class_weights(signal_type)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
-        loss = [ce_loss, SoftDiceLoss(global_weight=10.), CoherenceLoss(global_weight=5.)]
+        MSE_loss = nn.MSELoss()
+        sdice_w = float(view_weight) if view_weight is not None else 10.0
+        loss = [ce_loss, SoftDiceLoss(global_weight=sdice_w), MSE_loss, CoherenceLoss(global_weight=5.)]
     # zlw@20220302
     elif custom_loss == 'wce_w10sdice_w5col_sig_blnc':
-        weights = get_class_weights(signal_type)
+        weights = get_class_weights(signal_type, **kw)
         loss_weight = get_loss_weight(signal_type)
         weights = loss_weight*weights
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
@@ -214,7 +490,7 @@ def define_loss(signal_type, custom_loss, device):
                 CoherenceLoss(global_weight=5.)]
     # zlw@20220304
     elif custom_loss == 'wce_w10sdice_w5sofcol':
-        weights = get_class_weights(signal_type)
+        weights = get_class_weights(signal_type, **kw)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         ce_loss = ce_loss
         loss = [ce_loss, 
@@ -222,28 +498,28 @@ def define_loss(signal_type, custom_loss, device):
                 SoftCoherenceLoss(global_weight=5., relax_factor=0.2, margin=0.01)]
     # zlw@20220321
     elif custom_loss == 'wce_w10sdice_w5spacol':
-        weights = get_class_weights(signal_type)
+        weights = get_class_weights(signal_type, **kw)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, 
                 SoftDiceLoss(global_weight=10.), 
                 SparseCoherenceLoss(global_weight=5.)]
     # zlw@20220322
     elif custom_loss == 'wce_w10sdice_w5smospacol':
-        weights = get_class_weights(signal_type)
+        weights = get_class_weights(signal_type, **kw)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, 
                 SoftDiceLoss(global_weight=10.), 
                 SmoSpaCoherenceLoss(global_weight=5.)]
     # zlw@20220322
     elif custom_loss == 'wce_w10sdice_w5discol':
-        weights = get_class_weights(signal_type)
+        weights = get_class_weights(signal_type, **kw)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, 
                 SoftDiceLoss(global_weight=10.), 
                 DistributionCoherenceLoss(global_weight=5.)]
     # zlw@20220324
     elif custom_loss == 'wce_w10sdice_w5dnscol':
-        weights = get_class_weights(signal_type)
+        weights = get_class_weights(signal_type, **kw)
         ce_loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
         loss = [ce_loss, 
                 SoftDiceLoss(global_weight=10.), 

@@ -81,7 +81,14 @@ def main():
         net = torch.nn.SyncBatchNorm.convert_sync_batchnorm(net)
 
     if distributed:
-        net = DDP(net, device_ids=[args.local_rank], output_device=args.local_rank)
+        # Models such as TFocNet may leave some parameters unused in a given forward
+        # (e.g. conditional branches); DDP requires find_unused_parameters=True or training crashes.
+        net = DDP(
+            net,
+            device_ids=[args.local_rank],
+            output_device=args.local_rank,
+            find_unused_parameters=False,
+        )
 
     if cfg["seq_mode"]:
         ModelDDP(

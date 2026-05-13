@@ -127,6 +127,7 @@ class TFocConvV1(nn.Module):
         out_ch: int,
         btnk_ch: int,
         search_size: int,
+        prob_channels: int,
         attn_temperature: float = 1.0,
         metric_kernel_n: Optional[int] = None,
     ):
@@ -135,6 +136,7 @@ class TFocConvV1(nn.Module):
         self.k_n = int(search_size)
         self.pad_size = math.floor(self.k_n / 2)
         self.attn_temperature = float(attn_temperature)
+        self.tgt_index = -1
 
         self.spatial_conv = Double3DConvBlock(
             in_ch,
@@ -160,7 +162,13 @@ class TFocConvV1(nn.Module):
             strd=(2, 1, 1),
             pad=(0, 0, pad_n),
         )
-        self.inner_predict = TREBlock(self.btnk_ch, 4, k_size=(1, 1, 1), strd=(1, 1, 1), pad=(0, 0, 0))
+        self.inner_predict = TREBlock(
+            self.btnk_ch,
+            int(prob_channels),
+            k_size=(1, 1, 1),
+            strd=(1, 1, 1),
+            pad=(0, 0, 0),
+        )
 
         self.temporal_conv = nn.Sequential(
             TREBlock(self.btnk_ch, out_ch, k_size=(2, 1, 1), strd=(1, 1, 1), pad=(0, 0, 0)),
@@ -170,15 +178,35 @@ class TFocConvV1(nn.Module):
         self._grid_center_cache = {}
         self._grid_local_cache = {}
 
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+
+    @staticmethod
+    def _resolve_tgt_index(t: int, tgt_index: int) -> int:
+        if t <= 0:
+            return 0
+        idx = int(tgt_index)
+        if idx < 0:
+            idx = t + idx
+        if idx < 0:
+            idx = 0
+        if idx > t - 1:
+            idx = t - 1
+        return idx
+
     def forward(self, x_seq: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         x_seq = self.spatial_conv(x_seq)
         b, c, t, h, w = x_seq.shape
         device = x_seq.device
         n = self.k_n * self.k_n
 
-        x_tgt_ori = x_seq[:, :, -1, :, :].unsqueeze(2)
+        tgt_i = self._resolve_tgt_index(t, self.tgt_index)
+        x_tgt_ori = x_seq[:, :, tgt_i, :, :].unsqueeze(2)
         x_tgt_rep = x_tgt_ori.expand(-1, -1, t - 1, -1, -1)
-        x_hst = self.tfoc_prepadding(x_seq[:, :, : t - 1, :, :])
+        if t <= 1:
+            raise ValueError("TFocConvV1 expects at least 2 frames in time dimension.")
+        hist_idx = [ti for ti in range(t) if ti != tgt_i]
+        x_hst = self.tfoc_prepadding(x_seq[:, :, hist_idx, :, :])
 
         p_hst = self._gen_global_sample_grid(b, h, w, n, device=device)
 
@@ -205,7 +233,7 @@ class TFocConvV1(nn.Module):
         x_hist_agg = torch.sum(x_hist_agg * time_w.unsqueeze(1), dim=2)
         x_hist_agg = x_hist_agg.reshape(b, c, 1, h, w)
 
-        probs_map = probs_all.max(dim=-1).values.mean(dim=2).reshape(b, 4, h, w)
+        probs_map = probs_all.max(dim=-1).values.mean(dim=2).reshape(b, 5, h, w)
 
         x_fuse = torch.cat((x_hist_agg, x_tgt_ori), dim=2)
         x_out = self.temporal_conv(x_fuse)
@@ -266,10 +294,12 @@ class TFocConvV1(nn.Module):
 
 
 class EncodingBranch(nn.Module):
-    def __init__(self, signal_type: str, n_frames: int):
+    def __init__(self, signal_type: str, n_frames: int, n_classes: int):
         super().__init__()
         self.n_frames = n_frames
         self.signal_type = signal_type
+        self.n_classes = n_classes
+        self.tgt_index = -1
 
         self.double_3d_conv_block = Double3DConvBlock(
             in_ch=1,
@@ -285,6 +315,7 @@ class EncodingBranch(nn.Module):
             out_ch=128,
             btnk_ch=8,
             search_size=5,
+            prob_channels=self.n_classes,
             attn_temperature=1.0,
         )
 
@@ -293,29 +324,45 @@ class EncodingBranch(nn.Module):
         self.single_conv_block1_3x3 = ConvBlock(in_ch=128, out_ch=128, k_size=3, pad=1, dil=1)
         self.single_conv_block2_3x3 = ConvBlock(in_ch=128, out_ch=128, k_size=3, pad=1, dil=1)
         self.single_conv_block1_1x1 = ConvBlock(in_ch=128, out_ch=128, k_size=1, pad=0, dil=1)
+        self.single_conv_block1_3x3_prb = ConvBlock(in_ch=self.n_classes, out_ch=32, k_size=3, pad=1, dil=1)
+        self.single_conv_block2_3x3_prb = ConvBlock(in_ch=32, out_ch=32, k_size=3, pad=1, dil=1)
+        self.single_conv_block1_1x1_prb = ConvBlock(in_ch=32, out_ch=32, k_size=1, pad=0, dil=1)
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.tfoc_conv_block.set_tgt_index(self.tgt_index)
+
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         x0 = self.double_3d_conv_block(x)
-        x1, _ = self.tfoc_conv_block(x0)
+        x1, prb1 = self.tfoc_conv_block(x0)
         x1 = x1.squeeze(dim=2)
 
         if self.signal_type in ("range_doppler", "angle_doppler"):
             x1_pad = F.pad(x1, (0, 1, 0, 0), "constant", 0)
             x1_down = self.doppler_max_pool(x1_pad)
+            prb1_pad = F.pad(prb1, (0, 1, 0, 0), "constant", 0)
+            prb1_down = self.doppler_max_pool(prb1_pad)
         else:
             x1_down = self.max_pool(x1)
+            prb1_down = self.max_pool(prb1)
 
         x2 = self.single_conv_block1_3x3(x1_down)
         x2 = self.single_conv_block2_3x3(x2)
+        prb2 = self.single_conv_block1_3x3_prb(prb1_down)
+        prb2 = self.single_conv_block2_3x3_prb(prb2)
 
         if self.signal_type in ("range_doppler", "angle_doppler"):
             x2_pad = F.pad(x2, (0, 1, 0, 0), "constant", 0)
             x2_down = self.doppler_max_pool(x2_pad)
+            prb2_pad = F.pad(prb2, (0, 1, 0, 0), "constant", 0)
+            prb2_down = self.doppler_max_pool(prb2_pad)
         else:
             x2_down = self.max_pool(x2)
+            prb2_down = self.max_pool(prb2)
 
         x3 = self.single_conv_block1_1x1(x2_down)
-        return x2_down, x3
+        prb3 = self.single_conv_block1_1x1_prb(prb2_down)
+        return x2_down, x3, prb2_down, prb3
 
 
 class TFocNet(nn.Module):
@@ -325,9 +372,10 @@ class TFocNet(nn.Module):
         self.n_frames = n_frames
         self.view_type = signal_type
         self.zero_doppler_filter = zero_doppler_filter
+        self.tgt_index = -1
 
         # Backbone (single-view encoding)
-        self.encoding_branch = EncodingBranch(self.view_type, self.n_frames)
+        self.encoding_branch = EncodingBranch(self.view_type, self.n_frames, self.n_classes)
 
         # ASPP
         self.aspp_block = ASPPBlock(in_ch=128, out_ch=128)
@@ -347,11 +395,26 @@ class TFocNet(nn.Module):
         self.double_conv_block2 = DoubleConvBlock(in_ch=128, out_ch=128, k_size=3, pad=1, dil=1)
         self.final = nn.Conv2d(in_channels=128, out_channels=n_classes, kernel_size=1)
 
+        self.single_conv_block2_1x1_prb = ConvBlock(in_ch=32 * 2, out_ch=32, k_size=1, pad=0, dil=1)
+        if self.view_type in ("range_doppler", "angle_doppler"):
+            self.upconv1_prb = nn.ConvTranspose2d(32 * 2, 32, (2, 1), stride=(2, 1))
+            self.upconv2_prb = nn.ConvTranspose2d(32, 32, (2, 1), stride=(2, 1))
+        else:
+            self.upconv1_prb = nn.ConvTranspose2d(32 * 2, 32, 2, stride=2)
+            self.upconv2_prb = nn.ConvTranspose2d(32, 32, 2, stride=2)
+        self.double_conv_block1_prb = DoubleConvBlock(in_ch=32, out_ch=32, k_size=3, pad=1, dil=1)
+        self.double_conv_block2_prb = DoubleConvBlock(in_ch=32, out_ch=32, k_size=3, pad=1, dil=1)
+        self.final_prb = nn.Conv2d(in_channels=32, out_channels=n_classes, kernel_size=1, padding=0)
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.encoding_branch.set_tgt_index(self.tgt_index)
+
     def forward(self, x: torch.Tensor):
         if self.zero_doppler_filter and self.view_type in ("range_doppler", "angle_doppler"):
             x = self._zero_doppler_filter(x)
 
-        features, latent = self.encoding_branch(x)
+        features, latent, prb, prb_latent = self.encoding_branch(x)
         x1 = self.aspp_block(features)
         x2 = self.single_conv_block1_1x1(x1)
         x3 = self.single_conv_block2_1x1(latent)
@@ -362,7 +425,16 @@ class TFocNet(nn.Module):
         x7 = self.upconv2(x6)
         x8 = self.double_conv_block2(x7)
         x9 = self.final(x8)
-        return x9
+
+        prb_fusion = torch.cat((prb, prb_latent), 1)
+        prb_fusion = self.single_conv_block2_1x1_prb(prb_fusion)
+        x4_prb = torch.cat((prb, prb_fusion), 1)
+        x5_prb = self.upconv1_prb(x4_prb)
+        x6_prb = self.double_conv_block1_prb(x5_prb)
+        x7_prb = self.upconv2_prb(x6_prb)
+        x8_prb = self.double_conv_block2_prb(x7_prb)
+        x9_prb = self.final_prb(x8_prb)
+        return x9, x9_prb
 
     def _zero_doppler_filter(self, rd: torch.Tensor) -> torch.Tensor:
         device = rd.device
