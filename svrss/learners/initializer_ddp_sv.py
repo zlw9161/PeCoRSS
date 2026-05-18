@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
 from svrss.loaders.dataset import Carrada, CWRdata, PDRdata
-from svrss.loaders.dataloaders_sv import SequenceDataset
+from svrss.loaders.dataloaders_sv import SVGlobalWindowTrainDataset, SequenceDataset
 from svrss.utils.paths import Paths
 
 
@@ -45,7 +45,15 @@ class InitializerDDPSV:
 
     def _get_datasets(self):
         train_d, val_d, test_d = self._get_data()
-        trainset = SequenceDataset(train_d)
+        if self.cfg.get("seq_shuffle", False):
+            trainset = SVGlobalWindowTrainDataset(train_d, self.cfg)
+            if len(trainset) == 0:
+                raise RuntimeError(
+                    "seq_shuffle is True but no training windows were built "
+                    "(check nb_input_channels vs sequence lengths)."
+                )
+        else:
+            trainset = SequenceDataset(train_d)
         valset = SequenceDataset(val_d)
         testset = SequenceDataset(test_d)
         return [trainset, valset, testset]
@@ -103,17 +111,28 @@ class InitializerDDPSV:
         trainset, valset, testset = self._get_datasets()
 
         train_sampler = None
+        use_seq_shuffle = self.cfg.get("seq_shuffle", False)
         if self.distributed:
+            sampler_shuffle = (not use_seq_shuffle) or bool(self.cfg.get("shuffle", True))
             train_sampler = DistributedSampler(
-                trainset, num_replicas=self.world_size, rank=self.rank, shuffle=True
+                trainset,
+                num_replicas=self.world_size,
+                rank=self.rank,
+                shuffle=sampler_shuffle,
             )
 
+        nw_train = self.cfg.get("num_workers", 2) if use_seq_shuffle else 0
+        bs_train = self.cfg["batch_size"] if use_seq_shuffle else 1
+        if use_seq_shuffle:
+            shuffle_train = (train_sampler is None) and bool(self.cfg.get("shuffle", True))
+        else:
+            shuffle_train = train_sampler is None
         trainloader = DataLoader(
             trainset,
-            batch_size=1,
-            shuffle=train_sampler is None,
+            batch_size=bs_train,
+            shuffle=shuffle_train,
             sampler=train_sampler,
-            num_workers=0,
+            num_workers=nw_train,
         )
 
         if self.rank == 0 or not self.distributed:

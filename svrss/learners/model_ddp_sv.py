@@ -66,6 +66,7 @@ class ModelDDP(nn.Module):
         self.num_workers = self.cfg.get("num_workers", 2)
         self.cmplx_flag = self.cfg.get("cmplx_flag", False)
         self.mulmask = bool(self.cfg.get("mulmask", False))
+        self.seq_shuffle = bool(self.cfg.get("seq_shuffle", False))
         self.track_gamma = float(self.cfg.get("track_gamma", 0.9))
         self.track_weight = float(self.cfg.get("track_weight", 0.5))
         self.tgt = int(self.cfg.get("tgt", -1))
@@ -272,256 +273,267 @@ class ModelDDP(nn.Module):
             ):
                 train_loader.sampler.set_epoch(epoch)
 
-            for _, sequence_data in enumerate(train_loader):
-                seq_name, seq = sequence_data
-                path_to_frames = self._sequence_frames_root(seq_name)
-                pe_type = self._peco_dataset_type()
-                _dataset = PeCoRSVDataset(
-                    seq,
-                    pe_type,
-                    self.annot_type,
-                    self.signal_type,
-                    path_to_frames,
-                    self.process_signal,
-                    self.n_frames,
-                    self.cmplx_flag,
-                    transformations,
-                    add_temp,
-                    self.mulmask,
-                )
-
-                frame_dataloader = DataLoader(
-                     _dataset,
-                    shuffle=self.is_shuffled,
-                    batch_size=self.batch_size,
-                    num_workers=self.num_workers,
-                )
-
-                for _, frame in enumerate(frame_dataloader):
-                    if self.signal_type in "range_doppler":
-                        sv_data = frame["rd_matrix"].to(self.device).float()
-                        sv_mask = frame["rd_mask"].to(self.device).float()
-                        sv_data = normalize(
-                            sv_data,
-                            "range_doppler",
-                            norm_type=self.norm_type,
-                            stats_json_path=_tvt_stats,
+            def iter_train_frames():
+                if not self.seq_shuffle:
+                    for _, sequence_data in enumerate(train_loader):
+                        seq_name, seq = sequence_data
+                        path_to_frames = self._sequence_frames_root(seq_name)
+                        pe_type = self._peco_dataset_type()
+                        _dataset = PeCoRSVDataset(
+                            seq,
+                            pe_type,
+                            self.annot_type,
+                            self.signal_type,
+                            path_to_frames,
+                            self.process_signal,
+                            self.n_frames,
+                            self.cmplx_flag,
+                            transformations,
+                            add_temp,
+                            self.mulmask,
                         )
-                    elif self.signal_type in "range_angle":
-                        sv_data = frame["ra_matrix"].to(self.device).float()
-                        sv_mask = frame["ra_mask"].to(self.device).float()
-                        sv_data = normalize(
-                            sv_data,
-                            "range_angle",
-                            norm_type=self.norm_type,
-                            stats_json_path=_tvt_stats,
-                        )
-                    else:
-                        raise ValueError("Unsupported signal_type: {}".format(self.signal_type))
 
-                    # Debug: verify data loading (shape + class distribution) once.
-                    if self.is_main_process and (not self._debug_first_batch_printed):
-                        try:
-                            y = torch.argmax(sv_mask, dim=1).detach().cpu()
-                            u, c = torch.unique(y, return_counts=True)
-                            cls_dist = {int(k): int(v) for k, v in zip(u.tolist(), c.tolist())}
-                        except Exception as exc:
-                            cls_dist = {"error": str(exc)}
+                        frame_dataloader = DataLoader(
+                            _dataset,
+                            shuffle=self.is_shuffled,
+                            batch_size=self.batch_size,
+                            num_workers=self.num_workers,
+                        )
+
+                        for _, frame in enumerate(frame_dataloader):
+                            yield frame, seq_name
+                else:
+                    ds = train_loader.dataset
+                    if hasattr(ds, "update_training_episode"):
+                        ds.update_training_episode(transformations, add_temp)
+                    for _, frame in enumerate(train_loader):
+                        yield frame, None
+
+            for frame, seq_name in iter_train_frames():
+                if self.signal_type in "range_doppler":
+                    sv_data = frame["rd_matrix"].to(self.device).float()
+                    sv_mask = frame["rd_mask"].to(self.device).float()
+                    sv_data = normalize(
+                        sv_data,
+                        "range_doppler",
+                        norm_type=self.norm_type,
+                        stats_json_path=_tvt_stats,
+                    )
+                elif self.signal_type in "range_angle":
+                    sv_data = frame["ra_matrix"].to(self.device).float()
+                    sv_mask = frame["ra_mask"].to(self.device).float()
+                    sv_data = normalize(
+                        sv_data,
+                        "range_angle",
+                        norm_type=self.norm_type,
+                        stats_json_path=_tvt_stats,
+                    )
+                else:
+                    raise ValueError("Unsupported signal_type: {}".format(self.signal_type))
+
+                # Debug: verify data loading (shape + class distribution) once.
+                if self.is_main_process and (not self._debug_first_batch_printed):
+                    try:
+                        y = torch.argmax(sv_mask, dim=1).detach().cpu()
+                        u, c = torch.unique(y, return_counts=True)
+                        cls_dist = {int(k): int(v) for k, v in zip(u.tolist(), c.tolist())}
+                    except Exception as exc:
+                        cls_dist = {"error": str(exc)}
                         print(
                             "[debug:first_batch] seq={} sv_data.shape={} sv_mask.shape={} mask_class_counts={}".format(
-                                seq_name[0],
+                                seq_name[0] if seq_name is not None else "seq_shuffle",
                                 tuple(sv_data.shape),
                                 tuple(sv_mask.shape),
                                 cls_dist,
                             )
                         )
-                        self._debug_first_batch_printed = True
+                    self._debug_first_batch_printed = True
 
-                    optimizer.zero_grad()
-                    net_outputs = self.net(sv_data)
-                    if isinstance(net_outputs, (tuple, list)):
-                        sv_outputs = net_outputs[0]
-                        track_logits = net_outputs[1] if len(net_outputs) > 1 else None
-                    else:
-                        sv_outputs = net_outputs
-                        track_logits = None
-                    sv_outputs = sv_outputs.to(self.device)
+                optimizer.zero_grad()
+                net_outputs = self.net(sv_data)
+                if isinstance(net_outputs, (tuple, list)):
+                    sv_outputs = net_outputs[0]
+                    track_logits = net_outputs[1] if len(net_outputs) > 1 else None
+                else:
+                    sv_outputs = net_outputs
+                    track_logits = None
+                sv_outputs = sv_outputs.to(self.device)
 
-                    if sv_mask.dim() == 5:
-                        tgt_idx = self._resolve_tgt_index(sv_mask.size(2), self.tgt)
-                        sv_tgt_mask = sv_mask[:, :, tgt_idx, :, :]
-                    else:
-                        sv_tgt_mask = sv_mask
-                    sv_losses = [
-                        c(sv_outputs, torch.argmax(sv_tgt_mask, axis=1)) for c in criterion
-                    ]
-                    loss = torch.mean(torch.stack(sv_losses))
+                if sv_mask.dim() == 5:
+                    tgt_idx = self._resolve_tgt_index(sv_mask.size(2), self.tgt)
+                    sv_tgt_mask = sv_mask[:, :, tgt_idx, :, :]
+                else:
+                    sv_tgt_mask = sv_mask
+                sv_losses = [
+                    c(sv_outputs, torch.argmax(sv_tgt_mask, axis=1)) for c in criterion
+                ]
+                loss = torch.mean(torch.stack(sv_losses))
 
-                    track_loss = None
-                    if self.mulmask and sv_mask.dim() == 5 and track_logits is not None:
-                        track_gt = build_track_heatmap(
-                            sv_mask, gamma=self.track_gamma, use_history=True
+                track_loss = None
+                if self.mulmask and sv_mask.dim() == 5 and track_logits is not None:
+                    track_gt = build_track_heatmap(
+                        sv_mask, gamma=self.track_gamma, use_history=True
+                    )
+                    track_pred = torch.sigmoid(track_logits)
+                    if track_pred.shape == track_gt.shape:
+                        track_loss = F.smooth_l1_loss(track_pred, track_gt)
+                        loss = loss + self.track_weight * track_loss
+
+                loss.backward()
+                optimizer.step()
+
+                reduced_loss = self._reduce_scalar(loss.detach())
+                running_losses.append(float(reduced_loss.item()))
+                if nb_losses > 1:
+                    reduced_ce = self._reduce_scalar(sv_losses[0].detach())
+                    reduced_dice = self._reduce_scalar(sv_losses[1].detach())
+                    running_ce_losses.append(float(reduced_ce.item()))
+                    running_dice_losses.append(float(reduced_dice.item()))
+                if track_loss is not None:
+                    reduced_track = self._reduce_scalar(track_loss.detach())
+                    running_track_losses.append(float(reduced_track.item()))
+
+                if iteration % self.loss_step == 0:
+                    train_loss = float(np.mean(running_losses)) if running_losses else 0.0
+                    if self.is_main_process:
+                        print(
+                            f"[Epoch {epoch+1}/{self.nb_epochs}, iter {iteration}]: Train loss {train_loss}",
+                            flush=True,
                         )
-                        track_pred = torch.sigmoid(track_logits)
-                        if track_pred.shape == track_gt.shape:
-                            track_loss = F.smooth_l1_loss(track_pred, track_gt)
-                            loss = loss + self.track_weight * track_loss
-
-                    loss.backward()
-                    optimizer.step()
-
-                    reduced_loss = self._reduce_scalar(loss.detach())
-                    running_losses.append(float(reduced_loss.item()))
-                    if nb_losses > 1:
-                        reduced_ce = self._reduce_scalar(sv_losses[0].detach())
-                        reduced_dice = self._reduce_scalar(sv_losses[1].detach())
-                        running_ce_losses.append(float(reduced_ce.item()))
-                        running_dice_losses.append(float(reduced_dice.item()))
-                    if track_loss is not None:
-                        reduced_track = self._reduce_scalar(track_loss.detach())
-                        running_track_losses.append(float(reduced_track.item()))
-
-                    if iteration % self.loss_step == 0:
-                        train_loss = float(np.mean(running_losses)) if running_losses else 0.0
-                        if self.is_main_process:
+                        if nb_losses > 1:
+                            train_ce_loss = float(np.mean(running_ce_losses)) if running_ce_losses else 0.0
+                            train_dice_loss = float(np.mean(running_dice_losses)) if running_dice_losses else 0.0
                             print(
-                                f"[Epoch {epoch+1}/{self.nb_epochs}, iter {iteration}]: Train loss {train_loss}",
+                                f"[Epoch {epoch+1}/{self.nb_epochs}, iter {iteration}]: Train losses: CE={train_ce_loss}, Dice={train_dice_loss}",
                                 flush=True,
                             )
+                            self.visualizer.update_sv_train_loss(
+                                self.signal_type,
+                                train_loss,
+                                train_ce_loss,
+                                train_dice_loss,
+                                iteration,
+                            )
+                        else:
+                            train_ce_loss = train_loss
+                            self.visualizer.update_sv_train_global_only(
+                                self.signal_type, train_loss, iteration
+                            )
+                        if running_track_losses:
+                            train_track_loss = float(np.mean(running_track_losses))
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}, iter {iteration}]: Train Track loss {train_track_loss}",
+                                flush=True,
+                            )
+                        self.visualizer.update_learning_rate(
+                            scheduler.get_last_lr()[0], iteration
+                        )
+
+                    running_losses = []
+                    if nb_losses > 1:
+                        running_ce_losses = []
+                        running_dice_losses = []
+                    running_track_losses = []
+
+                if iteration % self.val_step == 0 and iteration > 0:
+                    if self.is_main_process:
+                        model_for_eval = self.net.module if hasattr(self.net, "module") else self.net
+                        if iteration % self.viz_step == 0:
+                            val_metrics = self.tester.predict(
+                                model_for_eval, val_loader, iteration, add_temp=add_temp
+                            )
+                        else:
+                            val_metrics = self.tester.predict(
+                                model_for_eval, val_loader, add_temp=add_temp
+                            )
+
+                        self.visualizer.update_sv_val_metrics(
+                            self.signal_type, val_metrics, iteration
+                        )
+                        vm = (
+                            val_metrics["range_doppler"]
+                            if self.signal_type in "range_doppler"
+                            else val_metrics["range_angle"]
+                        )
+                        view_tag = "RD" if self.signal_type in "range_doppler" else "RA"
+                        metric_key = "range_doppler" if self.signal_type in "range_doppler" else "range_angle"
+                        print(
+                            f"[Epoch {epoch+1}/{self.nb_epochs}] Val losses: {view_tag}={val_metrics[metric_key]['loss']}",
+                            flush=True,
+                        )
+                        if "track_loss" in val_metrics:
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}] Val Track losses: {view_tag}={val_metrics['track_loss']}",
+                                flush=True,
+                            )
+                        print(
+                            f"[Epoch {epoch+1}/{self.nb_epochs}] Val Dice: {view_tag}={vm['dice']}",
+                            flush=True,
+                        )
+
+                        test_metrics = self.tester.predict(
+                            model_for_eval, test_loader, add_temp=add_temp
+                        )
+                        self.visualizer.update_sv_test_metrics(
+                            self.signal_type, test_metrics, iteration
+                        )
+                        cur_dice = test_metrics[metric_key]["dice"]
+                        tm = test_metrics[metric_key]
+                        print(f"Learning Rate: {optimizer.param_groups[0]['lr']:.8f}", flush=True)
+                        print(
+                            f"[Epoch {epoch+1}/{self.nb_epochs}] Test losses: {view_tag}={tm['loss']}",
+                            flush=True,
+                        )
+                        if "track_loss" in test_metrics:
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}] Test Track losses: {view_tag}={test_metrics['track_loss']}",
+                                flush=True,
+                            )
+                        print(
+                            f"[Epoch {epoch+1}/{self.nb_epochs}] Test Prec: {view_tag}={tm['prec']}",
+                            flush=True,
+                        )
+                        print(
+                            f"[Epoch {epoch+1}/{self.nb_epochs}] Test mIoU: {view_tag}={tm['miou']}",
+                            flush=True,
+                        )
+                        print(
+                            f"[Epoch {epoch+1}/{self.nb_epochs}] Test Dice: {view_tag}={tm['dice']}",
+                            flush=True,
+                        )
+                        if cur_dice > best_test_dice and iteration > 0:
+                            best_test_dice = cur_dice
+                            print(
+                                f"[Epoch {epoch+1}/{self.nb_epochs}] New best test {view_tag} dice: {best_test_dice:.6f}. Saving checkpoint.",
+                                flush=True,
+                            )
+                            self.results["train_loss"] = float(train_loss)
+                            self.results["train_ce_loss"] = float(train_ce_loss)
                             if nb_losses > 1:
-                                train_ce_loss = float(np.mean(running_ce_losses)) if running_ce_losses else 0.0
-                                train_dice_loss = float(np.mean(running_dice_losses)) if running_dice_losses else 0.0
-                                print(
-                                    f"[Epoch {epoch+1}/{self.nb_epochs}, iter {iteration}]: Train losses: CE={train_ce_loss}, Dice={train_dice_loss}",
-                                    flush=True,
-                                )
-                                self.visualizer.update_sv_train_loss(
-                                    self.signal_type,
-                                    train_loss,
-                                    train_ce_loss,
-                                    train_dice_loss,
-                                    iteration,
-                                )
-                            else:
-                                train_ce_loss = train_loss
-                                self.visualizer.update_sv_train_global_only(
-                                    self.signal_type, train_loss, iteration
+                                self.results["train_dice_loss"] = float(
+                                    train_dice_loss
                                 )
                             if running_track_losses:
-                                train_track_loss = float(np.mean(running_track_losses))
-                                print(
-                                    f"[Epoch {epoch+1}/{self.nb_epochs}, iter {iteration}]: Train Track loss {train_track_loss}",
-                                    flush=True,
+                                self.results["train_track_loss"] = float(
+                                    np.mean(running_track_losses)
                                 )
-                            self.visualizer.update_learning_rate(
-                                scheduler.get_last_lr()[0], iteration
-                            )
+                            self.results["val_metrics"] = val_metrics
+                            self.results["test_metrics"] = test_metrics
+                            save_state = {
+                                "epoch": epoch + 1,
+                                "iteration": iteration + 1,
+                                "arch": str(self._model_ref()),
+                                "state_dict": self._model_ref().state_dict(),
+                                "best_dice": best_test_dice,
+                                "optimizer": optimizer.state_dict(),
+                                "scheduler": scheduler.state_dict(),
+                            }
+                            self._save_results(save_state)
+                        self.net.train()
+                    if self.distributed:
+                        dist.barrier()
 
-                        running_losses = []
-                        if nb_losses > 1:
-                            running_ce_losses = []
-                            running_dice_losses = []
-                        running_track_losses = []
-
-                    if iteration % self.val_step == 0 and iteration > 0:
-                        if self.is_main_process:
-                            model_for_eval = self.net.module if hasattr(self.net, "module") else self.net
-                            if iteration % self.viz_step == 0:
-                                val_metrics = self.tester.predict(
-                                    model_for_eval, val_loader, iteration, add_temp=add_temp
-                                )
-                            else:
-                                val_metrics = self.tester.predict(
-                                    model_for_eval, val_loader, add_temp=add_temp
-                                )
-
-                            self.visualizer.update_sv_val_metrics(
-                                self.signal_type, val_metrics, iteration
-                            )
-                            vm = (
-                                val_metrics["range_doppler"]
-                                if self.signal_type in "range_doppler"
-                                else val_metrics["range_angle"]
-                            )
-                            view_tag = "RD" if self.signal_type in "range_doppler" else "RA"
-                            metric_key = "range_doppler" if self.signal_type in "range_doppler" else "range_angle"
-                            print(
-                                f"[Epoch {epoch+1}/{self.nb_epochs}] Val losses: {view_tag}={val_metrics[metric_key]['loss']}",
-                                flush=True,
-                            )
-                            if "track_loss" in val_metrics:
-                                print(
-                                    f"[Epoch {epoch+1}/{self.nb_epochs}] Val Track losses: {view_tag}={val_metrics['track_loss']}",
-                                    flush=True,
-                                )
-                            print(
-                                f"[Epoch {epoch+1}/{self.nb_epochs}] Val Dice: {view_tag}={vm['dice']}",
-                                flush=True,
-                            )
-
-                            test_metrics = self.tester.predict(
-                                model_for_eval, test_loader, add_temp=add_temp
-                            )
-                            self.visualizer.update_sv_test_metrics(
-                                self.signal_type, test_metrics, iteration
-                            )
-                            cur_dice = test_metrics[metric_key]["dice"]
-                            tm = test_metrics[metric_key]
-                            print(f"Learning Rate: {optimizer.param_groups[0]['lr']:.8f}", flush=True)
-                            print(
-                                f"[Epoch {epoch+1}/{self.nb_epochs}] Test losses: {view_tag}={tm['loss']}",
-                                flush=True,
-                            )
-                            if "track_loss" in test_metrics:
-                                print(
-                                    f"[Epoch {epoch+1}/{self.nb_epochs}] Test Track losses: {view_tag}={test_metrics['track_loss']}",
-                                    flush=True,
-                                )
-                            print(
-                                f"[Epoch {epoch+1}/{self.nb_epochs}] Test Prec: {view_tag}={tm['prec']}",
-                                flush=True,
-                            )
-                            print(
-                                f"[Epoch {epoch+1}/{self.nb_epochs}] Test mIoU: {view_tag}={tm['miou']}",
-                                flush=True,
-                            )
-                            print(
-                                f"[Epoch {epoch+1}/{self.nb_epochs}] Test Dice: {view_tag}={tm['dice']}",
-                                flush=True,
-                            )
-                            if cur_dice > best_test_dice and iteration > 0:
-                                best_test_dice = cur_dice
-                                print(
-                                    f"[Epoch {epoch+1}/{self.nb_epochs}] New best test {view_tag} dice: {best_test_dice:.6f}. Saving checkpoint.",
-                                    flush=True,
-                                )
-                                self.results["train_loss"] = float(train_loss)
-                                self.results["train_ce_loss"] = float(train_ce_loss)
-                                if nb_losses > 1:
-                                    self.results["train_dice_loss"] = float(
-                                        train_dice_loss
-                                    )
-                                if running_track_losses:
-                                    self.results["train_track_loss"] = float(
-                                        np.mean(running_track_losses)
-                                    )
-                                self.results["val_metrics"] = val_metrics
-                                self.results["test_metrics"] = test_metrics
-                                save_state = {
-                                    "epoch": epoch + 1,
-                                    "iteration": iteration + 1,
-                                    "arch": str(self._model_ref()),
-                                    "state_dict": self._model_ref().state_dict(),
-                                    "best_dice": best_test_dice,
-                                    "optimizer": optimizer.state_dict(),
-                                    "scheduler": scheduler.state_dict(),
-                                }
-                                self._save_results(save_state)
-                            self.net.train()
-                        if self.distributed:
-                            dist.barrier()
-
-                    iteration += 1
+                iteration += 1
 
             # After all optimizer updates in this epoch (matches PyTorch LR scheduler order).
             next_ep = epoch + 1

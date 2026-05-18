@@ -353,6 +353,49 @@ def get_metrics(metrics, loss, losses=None):
     return metrics_values
 
 
+def _normalize_instance_minmax(data: torch.Tensor) -> torch.Tensor:
+    """Per-batch-item and per-temporal-frame min-max (instance / frame-wise).
+
+    Matches TFoc SV tensors shaped ``(B, C, T, H, W)`` after ``add_temp``: for each
+    pair ``(b, t)`` normalise the slice over ``(C, H, W)``. Also supports common
+    variants ``(B, T, H, W)``, ``(B, C, H, W)``, and ``(B, Cp, T, C, H, W)``.
+    """
+    x = data
+    if not torch.is_tensor(x):
+        x = torch.as_tensor(x)
+    if x.dim() < 3:
+        min_v = torch.min(x)
+        max_v = torch.max(x)
+        denom = torch.sub(max_v, min_v)
+        denom = torch.where(denom.abs() < 1e-12, torch.ones_like(denom), denom)
+        return torch.div(torch.sub(x, min_v), denom)
+
+    reduce_dims = None
+    if x.dim() == 6:
+        # e.g. (B, Cp, T, C, H, W)
+        reduce_dims = (1, 3, 4, 5)
+    elif x.dim() == 5:
+        # (B, C, T, H, W) — primary layout for Conv3d / TFoc
+        reduce_dims = (1, 3, 4)
+    elif x.dim() == 4:
+        d1, d2, d3 = x.shape[1], x.shape[2], x.shape[3]
+        spatial_min = min(d2, d3)
+        if d1 < spatial_min and spatial_min >= 4 * max(d1, 1):
+            # (B, T, H, W): one channel per time slice
+            reduce_dims = (2, 3)
+        else:
+            # (B, C, H, W) or ambiguous: one "frame" = all channels × spatial
+            reduce_dims = (1, 2, 3)
+    else:
+        reduce_dims = tuple(range(1, x.dim()))
+
+    min_v = x.amin(dim=reduce_dims, keepdim=True) 
+    max_v = x.amax(dim=reduce_dims, keepdim=True)
+    denom = torch.sub(max_v, min_v)
+    denom = torch.where(denom.abs() < 1e-12, torch.ones_like(denom), denom)
+    return torch.div(torch.sub(x, min_v), denom)
+
+
 def normalize(data, signal_type, norm_type='local', stats_json_path=None):
     """
     Method to normalise the radar views
@@ -366,7 +409,7 @@ def normalize(data, signal_type, norm_type='local', stats_json_path=None):
         Supported: 'range_doppler', 'range_angle' and 'angle_doppler'
     norm_type: str
         Type of normalisation to apply
-        Supported: 'local', 'tvt'
+        Supported: 'local', 'tvt', 'instance'
     stats_json_path: str | pathlib.Path | None
         For ``norm_type=='tvt'``, optional JSON with ``min_val`` / ``max_val``
         (e.g. PDR/CWR dataset ``rd_stats_all.json``). If ``None`` or missing,
@@ -389,6 +432,9 @@ def normalize(data, signal_type, norm_type='local', stats_json_path=None):
         )
         norm_data = torch.div(torch.sub(data, min_value), denom)
         return norm_data
+
+    if norm_type in ('instance',):
+        return _normalize_instance_minmax(data)
 
     elif signal_type == 'range_doppler':
         if norm_type == 'tvt':
@@ -463,7 +509,9 @@ def define_loss(signal_type, custom_loss, device, weights_dir=None, cfg=None):
         Training / inference config for class-weight key ordering (KuRALS vs Carrada).
     """
     kw = {'weights_dir': weights_dir, 'cfg': cfg}
-    if custom_loss == 'wce':
+    if custom_loss == 'ce':
+        loss = nn.CrossEntropyLoss()
+    elif custom_loss == 'wce':
         weights = get_class_weights(signal_type, **kw)
         loss = nn.CrossEntropyLoss(weight=weights.to(device).float())
     elif custom_loss == 'sdice':

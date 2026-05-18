@@ -270,6 +270,111 @@ class PeCoRSVDataset(Dataset):
         raise ValueError(f"Unsupported signal_type: {self.signal_type}")
 
 
+def _peco_dataset_type_from_cfg(cfg: dict) -> str:
+    """Mirror model_ddp_sv.ModelDDP._peco_dataset_type for dataloader construction."""
+    d = (cfg.get("dataset") or "").strip()
+    dl = d.lower()
+    if dl in ("cwr", "cwrdata"):
+        return "CWRdata"
+    if dl in ("pdr", "pdrdata"):
+        return "PDRdata"
+    if dl == "carrada":
+        st = cfg.get("signal_type")
+        if st == "range_doppler":
+            return "Carrada_RD"
+        if st == "range_angle":
+            return "Carrada_RA"
+        return "Carrada"
+    return d
+
+
+def _sequence_frames_root_from_cfg(cfg: dict, seq_name: str) -> Path:
+    """Mirror model_ddp_sv.ModelDDP._sequence_frames_root using string sequence name."""
+    paths = Paths().get()
+    dl = (cfg.get("dataset") or "").strip().lower()
+    if dl in ("cwr", "cwrdata"):
+        return paths["CWRdata"] / seq_name
+    if dl in ("pdr", "pdrdata"):
+        return paths["PDRdata"] / seq_name
+    if dl == "carrada" or dl.startswith("carrada"):
+        return paths["carrada"] / seq_name
+    if dl in ("xpddata", "xpd"):
+        return paths["XPDdata"] / seq_name
+    if dl in ("rdsyn",):
+        return paths["RDSyn"] / seq_name
+    if dl in ("nuaasim",):
+        return paths["NuaaSim"] / seq_name
+    raise KeyError(
+        f"_sequence_frames_root_from_cfg: unsupported cfg['dataset']={cfg.get('dataset')!r}"
+    )
+
+
+class SVGlobalWindowTrainDataset(Dataset):
+    """All sliding-window samples over the train split, indexed as a flat list.
+
+    Each item matches ``PeCoRSVDataset(seq, ...)[window_idx]`` for one sequence. Combined with
+    ``DataLoader(..., shuffle=True)`` or ``DistributedSampler(..., shuffle=True)``, window order
+    is randomized each epoch while still visiting every window exactly once per epoch (each index
+    owned by one rank under DDP).
+
+    Call :meth:`update_training_episode` at the start of each training epoch so augmentations
+    and ``add_temp`` stay in sync with :class:`ModelDDP`.
+    """
+
+    def __init__(self, split_dict: dict, cfg: dict):
+        self.cfg = cfg
+        self.split_dict = split_dict
+        self.n_frames = int(cfg["nb_input_channels"])
+        self.annot_type = cfg["annot_type"]
+        self.signal_type = cfg["signal_type"]
+        self.process_signal = cfg["process_signal"]
+        self.cmplx_flag = cfg.get("cmplx_flag", False)
+        self.mulmask = bool(cfg.get("mulmask", False))
+        self._transformations = None
+        self._add_temp = False
+
+        pe_type = _peco_dataset_type_from_cfg(cfg)
+        self._peco_by_seq = {}
+        self._pairs = []
+
+        for seq_name in sorted(split_dict.keys()):
+            seq = split_dict[seq_name]
+            nwin = len(seq) - self.n_frames + 1
+            if nwin <= 0:
+                continue
+            path_to_frames = _sequence_frames_root_from_cfg(cfg, seq_name)
+            self._peco_by_seq[seq_name] = PeCoRSVDataset(
+                seq,
+                pe_type,
+                self.annot_type,
+                self.signal_type,
+                path_to_frames,
+                self.process_signal,
+                self.n_frames,
+                self.cmplx_flag,
+                None,
+                False,
+                self.mulmask,
+            )
+            for widx in range(nwin):
+                self._pairs.append((seq_name, widx))
+
+    def __len__(self):
+        return len(self._pairs)
+
+    def update_training_episode(self, transformations, add_temp):
+        """Refresh augmentation pipeline and temporal axis flag on cached per-sequence loaders."""
+        self._transformations = transformations
+        self._add_temp = add_temp
+        for peco in self._peco_by_seq.values():
+            peco.transformations = transformations
+            peco.add_temp = add_temp
+
+    def __getitem__(self, idx):
+        seq_name, widx = self._pairs[idx]
+        return self._peco_by_seq[seq_name][widx]
+
+
 class Rescale:
     """Rescale the image in a sample to a given size.
 

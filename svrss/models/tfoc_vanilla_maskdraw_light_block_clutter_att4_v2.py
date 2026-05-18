@@ -6,10 +6,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-import os
+
 
 class DoubleConvBlock(nn.Module):
-    """ (2D conv => BN => LeakyReLU) * 2 """
+    """(Conv2d => BN => LeakyReLU) * 2 — aligned with v1_revise (no dropout)."""
 
     def __init__(self, in_ch, out_ch, k_size, pad, dil):
         super().__init__()
@@ -20,16 +20,14 @@ class DoubleConvBlock(nn.Module):
             nn.Conv2d(out_ch, out_ch, kernel_size=k_size, padding=pad, dilation=dil),
             nn.BatchNorm2d(out_ch),
             nn.LeakyReLU(inplace=True),
-            nn.Dropout2d(p=0.1)
         )
 
     def forward(self, x):
-        x = self.block(x)
-        return x
+        return self.block(x)
 
 
 class ConvBlock(nn.Module):
-    """ (2D conv => BN => LeakyReLU) """
+    """(Conv2d => BN => LeakyReLU) — aligned with v1_revise (no dropout)."""
 
     def __init__(self, in_ch, out_ch, k_size, pad, dil):
         super().__init__()
@@ -37,17 +35,14 @@ class ConvBlock(nn.Module):
             nn.Conv2d(in_ch, out_ch, kernel_size=k_size, padding=pad, dilation=dil),
             nn.BatchNorm2d(out_ch),
             nn.LeakyReLU(inplace=True),
-            nn.Dropout2d(p=0.1)
         )
 
     def forward(self, x):
-        x = self.block(x)
-        return x
+        return self.block(x)
 
 
 class TREBlock(nn.Module):
-    """ (3D conv => BN => LeakyReLU) """
-    """ Temporal Relation Embeddings """
+    """(Conv3d => BN => LeakyReLU) — aligned with v1_revise (no dropout)."""
 
     def __init__(self, in_ch, out_ch, k_size, strd, pad):
         super().__init__()
@@ -55,57 +50,35 @@ class TREBlock(nn.Module):
             nn.Conv3d(in_ch, out_ch, kernel_size=k_size, stride=strd, padding=pad),
             nn.BatchNorm3d(out_ch),
             nn.LeakyReLU(inplace=True),
-            nn.Dropout3d(p=0.1))
-
-    def forward(self, x):
-        x = self.block(x)
-        return x
-
-class TFocBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, k_size, strd, pad):
-        super().__init__()
-        self.layer1 = TREBlock(in_ch, out_ch, k_size=(k_size, 1, 1), strd=(strd, strd, strd), pad=(0, 0, 0))
-        self.layer2 = TREBlock(out_ch, out_ch, k_size=(1, k_size, k_size), strd=(strd, strd, strd), pad=(0, pad, pad))
-        #self.layer3 = TREBlock(out_ch, out_ch, k_size=(k_size, 1, 1), strd=(strd, strd, strd), pad=(0, 0, 0))
-
-    def forward(self, x):
-        #b, c, t, h, w = x.size(dim=0), x.size(dim=1), x.size(dim=2), x.size(dim=3), x.size(dim=4)
-        x1 = self.layer1(x) #(b,c,t-4,h,w)
-        x = self.layer2(x1) + x1 #(b,c,t-4,h,w)
-        # if self.layer3 is None:
-        #     self.layer3 = torch.nn.Linear(t*h*w, t*h*w, True).to(x.device)
-        #     self.register_module('Tfoc_fc', self.layer3)
-        # x1 = self.layer3(x.reshape(b*c, -1)).reshape(b, c, t, h, w) ##(b*c, t-4 * h*w) -> (b, c, t, h, w)
-        return x
-
-class Double3DConvBlock(nn.Module):
-    """ (3D conv => BN => LeakyReLU) * 2 (temporal shared 2D Conv)"""
-
-    def __init__(self, in_ch, out_ch, k_size, strd, pad, btnk_sc):
-        super().__init__()
-
-        self.block = nn.Sequential(
-            nn.Conv3d(in_ch, out_ch*btnk_sc, kernel_size=k_size, stride=strd, padding=pad),
-            nn.BatchNorm3d(out_ch*btnk_sc),
-            nn.LeakyReLU(inplace=True),
-            nn.Conv3d(out_ch*btnk_sc, out_ch, kernel_size=k_size, stride=strd, padding=pad),
-            nn.BatchNorm3d(out_ch),
-            nn.LeakyReLU(inplace=True),
-            nn.Dropout3d(p=0.1)
         )
 
     def forward(self, x):
-        x = self.block(x)
-        return x
+        return self.block(x)
+
+
+class Double3DConvBlock(nn.Module):
+    """(Conv3d => BN => LeakyReLU) * 2 — aligned with v1_revise (no dropout)."""
+
+    def __init__(self, in_ch, out_ch, k_size, strd, pad, btnk_sc):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv3d(in_ch, out_ch * btnk_sc, kernel_size=k_size, stride=strd, padding=pad),
+            nn.BatchNorm3d(out_ch * btnk_sc),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv3d(out_ch * btnk_sc, out_ch, kernel_size=k_size, stride=strd, padding=pad),
+            nn.BatchNorm3d(out_ch),
+            nn.LeakyReLU(inplace=True),
+        )
+
+    def forward(self, x):
+        return self.block(x)
+
 
 class ASPPBlock(nn.Module):
-    """Atrous Spatial Pyramid Pooling
-    Parallel conv blocks with different dilation rate
-    """
+    """Atrous Spatial Pyramid Pooling — same layout as v1_revise (adaptive pool + dilated branches)."""
 
     def __init__(self, in_ch, out_ch=256):
         super().__init__()
-        self.global_avg_pool = nn.AvgPool2d((64, 64))
         self.conv1_1x1 = nn.Conv2d(in_ch, out_ch, kernel_size=1, padding=0, dilation=1)
         self.single_conv_block1_1x1 = ConvBlock(in_ch, out_ch, k_size=1, pad=0, dil=1)
         self.single_conv_block1_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=6, dil=6)
@@ -113,27 +86,27 @@ class ASPPBlock(nn.Module):
         self.single_conv_block3_3x3 = ConvBlock(in_ch, out_ch, k_size=3, pad=18, dil=18)
 
     def forward(self, x):
-        x1 = F.interpolate(self.global_avg_pool(x), size=(64, 64), align_corners=False,
-                           mode='bilinear')
+        x1 = F.adaptive_avg_pool2d(x, (1, 1))
+        x1 = F.interpolate(x1, size=x.shape[2:], align_corners=False, mode="bilinear")
         x1 = self.conv1_1x1(x1)
         x2 = self.single_conv_block1_1x1(x)
         x3 = self.single_conv_block1_3x3(x)
         x4 = self.single_conv_block2_3x3(x)
         x5 = self.single_conv_block3_3x3(x)
-        x_cat = torch.cat((x2, x3, x4, x5, x1), 1)
-        return x_cat
+        return torch.cat((x2, x3, x4, x5, x1), 1)
 
 
 class TFocConv(nn.Module):
     """Temporal Focusing Conv Block w/ single historic frame
     input: x_seq = Conv3D(x) BxCx2xHxW tensor
-    output: x_tfc BxCxHxW tensor
+    output: x_tfc BxCxHxW tensor, probs_map BxKxHxW (per-class track branch, same as mvrss att4_v2)
     """
 
-    def __init__(self, in_ch, out_ch, btnk_ch, search_size):
+    def __init__(self, in_ch, out_ch, btnk_ch, search_size, n_classes):
         super(TFocConv, self).__init__()
         self.btnk_ch = btnk_ch
         self.k_n = search_size
+        self.n_classes = int(n_classes)
         self.pad_size = math.floor(search_size / 2)
         self.spatial_conv = Double3DConvBlock(in_ch,
                                               self.btnk_ch,
@@ -155,7 +128,7 @@ class TFocConv(nn.Module):
                                       strd=(1, 1, 1),
                                       pad=(0, 1, 0))
         self.inner_predict = TREBlock(self.btnk_ch,
-                                      4,
+                                      self.n_classes,
                                       k_size=(1, 1, 1),
                                       strd=(1, 1, 1),
                                       pad=(0, 0, 0))
@@ -164,8 +137,24 @@ class TFocConv(nn.Module):
             TREBlock(self.btnk_ch, out_ch, k_size=(2, 1, 1), strd=(1, 1, 1), pad=(0, 0, 0)),
             TREBlock(out_ch, out_ch, k_size=(1, 1, 1), strd=(1, 1, 1), pad=(0, 0, 0)),
         )
+        self.tgt_index = -1
         #self.tfoc_postpadding = nn.ReplicationPad3d((2, 2, 2, 2, 0, 0))  # zlw@20230816
 
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+
+    @staticmethod
+    def _resolve_tgt_index(t: int, tgt_index: int) -> int:
+        if t <= 0:
+            return 0
+        idx = int(tgt_index)
+        if idx < 0:
+            idx = t + idx
+        if idx < 0:
+            idx = 0
+        if idx > t - 1:
+            idx = t - 1
+        return idx
 
     def forward(self, x_seq): #x_mask(b,c,t,h,w)
         x_seq = self.spatial_conv(x_seq)
@@ -176,7 +165,8 @@ class TFocConv(nn.Module):
 
         # 1 extract x_tgt, repeat t-1 times in time dim and padding
         ###########!!!!!!chose the location of x_tgt!!!!!!!!!##############
-        x_tgt_ori = x_seq[:, :, -1, :, :]  # (b,c,h,w)
+        tgt_i = self._resolve_tgt_index(t, self.tgt_index)
+        x_tgt_ori = x_seq[:, :, tgt_i, :, :]  # (b,c,h,w)
         #x_tgt_ori = x_seq[:, :, int((t - 1) / 2), :, :]  # (b,c,h,w)
         ###################################################################
         x_tgt_ori = torch.unsqueeze(x_tgt_ori, 2)  # (b,c,1,h,w)
@@ -214,8 +204,10 @@ class TFocConv(nn.Module):
         metric_feat = self.block_pair_metric(x_seq.reshape(b * (t - 1), c, 2 * n, h, w))  # (b*(t-1),c,n,h,w)
         metric_feat = metric_feat.reshape(b, c, t - 1, n, h * w)  # (b,c,t-1,n,h*w)
         metric_feat = self.cand_interact(metric_feat)  # (b,c,t-1,n,h*w)
-        logits = self.inner_predict(metric_feat)  # (b,4,t-1,n,h*w)
-        probs_all = self.softmax(logits)  # (b,4,t-1,n,h*w)
+        logits = self.inner_predict(metric_feat)  # (b,K,t-1,n,h*w)
+        probs_all = self.softmax(logits)  # (b,K,t-1,n,h*w)
+        # Track / maskdraw branch (mvrss tfoc_vanilla_maskdraw_light_block_clutter_att4_v2)
+        probs_map = probs_all.max(dim=3).values.mean(dim=2).view(b, self.n_classes, h, w)
         score_n = 1.0 - probs_all[:, 0, ...]  # (b,t-1,n,h*w)
         att_n = F.softmax(score_n.unsqueeze(1), dim=3)  # (b,1,t-1,n,h*w), normalized over n
 
@@ -229,7 +221,7 @@ class TFocConv(nn.Module):
         ###################################################################
     
         x_tfoc = self.temporal_conv(x_tfoc)# (b,c,1,h,w)
-        return x_tfoc
+        return x_tfoc, probs_map
 
     # getting center grid from the padded grid of input x_tgt
     def _get_grid_center(self, b, h, w, n, dtype):
@@ -285,7 +277,7 @@ class TFocConv(nn.Module):
         index = index.contiguous().unsqueeze(dim=1).expand(-1, t, -1, -1, -1)
         index = index.contiguous().unsqueeze(dim=1).expand(-1, c, -1, -1, -1, -1)
         index = index.contiguous().view(b, c, t, -1)
-        index = index.long().cuda()  # cuda0 int64 [b,128,t-1,h*w*N]
+        index = index.long().to(device=x_pad.device)
         x_r = x_pad.gather(dim=-1, index=index)
         x_r = x_r.contiguous().view(b, c, t, h, w, N)
         return x_r  # cuda0 float32
@@ -295,63 +287,75 @@ class TFocConv(nn.Module):
 
 
 class EncodingBranch(nn.Module):
-    """
-    Backbone Encoding branch for a single radar view
+    """Backbone for a single radar view (post-TFoc blocks match v1_revise)."""
 
-    PARAMETERS
-    ----------
-    signal_type: str
-        Type of radar view.
-        Supported: 'range_doppler', 'range_angle' and 'angle_doppler'
-        Tensor shape: time x range(angle) x doppler(angle)
-    """
-
-    def __init__(self, signal_type, n_frames, search_size):
+    def __init__(self, signal_type, n_frames, search_size, n_classes):
         super().__init__()
         self.n_frames = n_frames
         self.signal_type = signal_type
         self.search_size = search_size
+        self.n_classes = int(n_classes)
+        self.tgt_index = -1
 
-        self.double_3d_conv_block = Double3DConvBlock(in_ch=1,
-                                                      out_ch=64,
-                                                      k_size=(3,3,3),
-                                                      strd=(1,1,1),
-                                                      pad=(0,1,1),
-                                                      btnk_sc=1)
-        self.tfoc_conv_block = TFocConv(in_ch=64,
-                                        out_ch=128,
-                                        btnk_ch=8, #out_ch/btnk_sc
-                                        search_size=self.search_size)
+        self.double_3d_conv_block = Double3DConvBlock(
+            in_ch=1,
+            out_ch=64,
+            k_size=(3, 3, 3),
+            strd=(1, 1, 1),
+            pad=(0, 1, 1),
+            btnk_sc=1,
+        )
+        self.tfoc_conv_block = TFocConv(
+            in_ch=64,
+            out_ch=128,
+            btnk_ch=8,
+            search_size=self.search_size,
+            n_classes=self.n_classes,
+        )
         self.doppler_max_pool = nn.MaxPool2d(2, stride=(2, 1))
         self.max_pool = nn.MaxPool2d(2, stride=2)
         self.single_conv_block1_3x3 = ConvBlock(in_ch=128, out_ch=128, k_size=3, pad=1, dil=1)
         self.single_conv_block2_3x3 = ConvBlock(in_ch=128, out_ch=128, k_size=3, pad=1, dil=1)
         self.single_conv_block1_1x1 = ConvBlock(in_ch=128, out_ch=128, k_size=1, pad=0, dil=1)
+        self.single_conv_block1_3x3_prb = ConvBlock(in_ch=self.n_classes, out_ch=32, k_size=3, pad=1, dil=1)
+        self.single_conv_block2_3x3_prb = ConvBlock(in_ch=32, out_ch=32, k_size=3, pad=1, dil=1)
+        self.single_conv_block1_1x1_prb = ConvBlock(in_ch=32, out_ch=32, k_size=1, pad=0, dil=1)
+
+    def set_tgt_index(self, tgt_index: int) -> None:
+        self.tgt_index = int(tgt_index)
+        self.tfoc_conv_block.set_tgt_index(self.tgt_index)
 
     def forward(self, x):
-        x0 = self.double_3d_conv_block(x)  # [b,128,(n_frames-3+1-3+1),h,w]
-        x1 = self.tfoc_conv_block(x0)  # x1:[b,128,1,h,w]
+        x0 = self.double_3d_conv_block(x)
+        x1, prb1 = self.tfoc_conv_block(x0)
         x1 = x1.squeeze(dim=2)
-        if self.signal_type in ('range_doppler', 'angle_doppler'):
-            # The Doppler dimension requires a specific processing
-            # padding the last two dimentions of the tensor
-            x1_pad = F.pad(x1, (0, 1, 0, 0), "constant", 0)  # F.pad(top, bottom, left, right)
-            x1_down = self.doppler_max_pool(x1_pad)
-        else:
-            x1_down = self.max_pool(x1)  # [2,128,128,128]
 
-        x2 = self.single_conv_block1_3x3(x1_down)  # [2,128,128,128]
-        x2 = self.single_conv_block2_3x3(x2)  # [2,128,128,128]
-        if self.signal_type in ('range_doppler', 'angle_doppler'):
-            # The Doppler dimension requires a specific processing
+        if self.signal_type in ("range_doppler", "angle_doppler"):
+            x1_pad = F.pad(x1, (0, 1, 0, 0), "constant", 0)
+            x1_down = self.doppler_max_pool(x1_pad)
+            prb1_pad = F.pad(prb1, (0, 1, 0, 0), "constant", 0)
+            prb1_down = self.doppler_max_pool(prb1_pad)
+        else:
+            x1_down = self.max_pool(x1)
+            prb1_down = self.max_pool(prb1)
+
+        x2 = self.single_conv_block1_3x3(x1_down)
+        x2 = self.single_conv_block2_3x3(x2)
+        prb2 = self.single_conv_block1_3x3_prb(prb1_down)
+        prb2 = self.single_conv_block2_3x3_prb(prb2)
+
+        if self.signal_type in ("range_doppler", "angle_doppler"):
             x2_pad = F.pad(x2, (0, 1, 0, 0), "constant", 0)
             x2_down = self.doppler_max_pool(x2_pad)
+            prb2_pad = F.pad(prb2, (0, 1, 0, 0), "constant", 0)
+            prb2_down = self.doppler_max_pool(prb2_pad)
         else:
-            x2_down = self.max_pool(x2)  # [2,128,64,64]
+            x2_down = self.max_pool(x2)
+            prb2_down = self.max_pool(prb2)
 
-        x3 = self.single_conv_block1_1x1(x2_down)  # [2,128,64,64]
-        # return input of TAM (x2_down) & ASPP block (x3) & Latent space (x3)
-        return x2_down, x3
+        x3 = self.single_conv_block1_1x1(x2_down)
+        prb3 = self.single_conv_block1_1x1_prb(prb2_down)
+        return x2_down, x3, prb2_down, prb3
 
 
 class TFocNet(nn.Module):
@@ -361,7 +365,7 @@ class TFocNet(nn.Module):
         self,
         n_classes,
         n_frames,
-        search_size=5,
+        search_size=3,
         signal_type="range_doppler",
         zero_doppler_filter=True,
     ):
@@ -380,7 +384,7 @@ class TFocNet(nn.Module):
         else:
             ss = int(search_size)
 
-        self.encoding_branch = EncodingBranch(self.view_type, self.n_frames, ss)
+        self.encoding_branch = EncodingBranch(self.view_type, self.n_frames, ss, self.n_classes)
 
         self.aspp_block = ASPPBlock(in_ch=128, out_ch=128)
         self.single_conv_block1_1x1 = ConvBlock(in_ch=640, out_ch=128, k_size=1, pad=0, dil=1)

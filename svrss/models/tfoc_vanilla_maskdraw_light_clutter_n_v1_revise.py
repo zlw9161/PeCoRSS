@@ -219,17 +219,17 @@ class TFocConvV1(nn.Module):
         pair = torch.stack((x_hst_flat, x_tgt_flat), dim=3)
         pair = pair.reshape(b, c, 2 * (t - 1), h * w, n)
 
-        pair_feat = self.pair_interact(pair)
-        logits = self.inner_predict(pair_feat)
-        probs_all = F.softmax(logits, dim=1)
+        pair_feat = self.pair_interact(pair) # (b, c, (t - 1), h * w, n)
+        logits = self.inner_predict(pair_feat) # (b, 5, (t - 1), h * w, n)
+        probs_all = F.softmax(logits, dim=1) # (b, 5, (t - 1), h * w, n)
 
-        attn_score = 1.0 - probs_all[:, 0, ...]
-        attn = F.softmax(attn_score / max(self.attn_temperature, 1e-6), dim=-1)
+        attn_score = 1.0 - probs_all[:, 0, ...] #(b, (t - 1), h * w, n)
+        attn = F.softmax(attn_score / max(self.attn_temperature, 1e-6), dim=-1)# (b, c, t - 1, h * w, n)
 
-        x_hist_agg = torch.sum(x_hst_flat * attn.unsqueeze(1), dim=-1)
+        x_hist_agg = torch.sum(x_hst_flat * attn.unsqueeze(1), dim=-1)# (b, c, t - 1, h * w)
 
-        time_score = attn_score.mean(dim=-1)
-        time_w = F.softmax(time_score, dim=1)
+        time_score = attn_score.mean(dim=-1) # (b, (t - 1), h * w)
+        time_w = F.softmax(time_score, dim=1) # (b, (t - 1), h * w)
         x_hist_agg = torch.sum(x_hist_agg * time_w.unsqueeze(1), dim=2)
         x_hist_agg = x_hist_agg.reshape(b, c, 1, h, w)
 
@@ -314,7 +314,7 @@ class EncodingBranch(nn.Module):
             in_ch=64,
             out_ch=128,
             btnk_ch=8,
-            search_size=5,
+            search_size=3,
             prob_channels=self.n_classes,
             attn_temperature=1.0,
         )
