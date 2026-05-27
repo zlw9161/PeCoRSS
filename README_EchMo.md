@@ -11,8 +11,9 @@
 - [2. Environment and Path Setup](#2-environment-and-path-setup)
 - [3. Training: Full EchMo Family](#3-training-full-echmo-family)
 - [4. Inference: infer_echmo.py](#4-inference-inferechmopy)
-- [5. App Visualization](#5-app-visualization)
-- [6. FAQ](#6-faq)
+- [5. Profiling: profiling_echmo_testbook.py](#5-profiling-profiling_echmo_testbookpy)
+- [6. App Visualization](#6-app-visualization)
+- [7. FAQ](#7-faq)
 
 ---
 
@@ -154,13 +155,153 @@ python -m svrss.infer_echmo --cfg svrss/config_files/rechmo.json --no-quali
 
 ---
 
-## 5. App Visualization
+## 5. Profiling: profiling_echmo_testbook.py
+
+The profiling entrypoint is:
+
+- [svrss/profiling_echmo_testbook.py](svrss/profiling_echmo_testbook.py)
+
+It supports:
+
+- scratch initialization or pretrained checkpoint loading
+- inference and train-style profiling
+- module-wise, end2end, and front-back profiling levels
+- random and config-driven synthetic input construction
+- single-GPU and DDP execution
+- Markdown and JSON report export
+
+### 5.1 Parameter Source Priority
+
+The profiling script resolves runtime settings in this order:
+
+1. CLI explicit arguments
+2. profiling-specific config fields such as `profile_batch_size` or `profile_data_mode`
+3. existing training config fields such as `batch_size` or `lr`
+4. script fallback defaults
+
+Supported profiling-specific config fields:
+
+- `profile_batch_size`
+- `profile_warmup_iters`
+- `profile_measure_iters`
+- `profile_train_lr`
+- `profile_data_mode`
+- `profile_input_scale`
+- `profile_input_offset`
+
+### 5.2 Single-GPU Scratch Profiling
+
+```bash
+python svrss/profiling_echmo_testbook.py \
+	--cfg svrss/config_files/echmo_itc_scale.json \
+	--load-mode scratch
+```
+
+### 5.3 Single-GPU Pretrained Profiling
+
+```bash
+python svrss/profiling_echmo_testbook.py \
+	--cfg svrss/config_files/echmo_itc_scale.json \
+	--load-mode pretrained \
+	--model-path /abs/path/to/checkpoint.pt
+```
+
+### 5.4 Random vs Config Data Mode
+
+Use random synthetic input:
+
+```bash
+python svrss/profiling_echmo_testbook.py \
+	--cfg svrss/config_files/echmo_itc_scale.json \
+	--load-mode scratch \
+	--data-mode random
+```
+
+Use config-driven deterministic input:
+
+```bash
+python svrss/profiling_echmo_testbook.py \
+	--cfg svrss/config_files/echmo_itc_scale.json \
+	--load-mode scratch \
+	--data-mode config
+```
+
+### 5.5 Restrict Tasks and Profiling Levels
+
+Inference-only end-to-end profiling:
+
+```bash
+python svrss/profiling_echmo_testbook.py \
+	--cfg svrss/config_files/echmo_itc_scale.json \
+	--load-mode scratch \
+	--tasks infer \
+	--levels end2end
+```
+
+Train and infer profiling across all levels:
+
+```bash
+python svrss/profiling_echmo_testbook.py \
+	--cfg svrss/config_files/echmo_itc_scale.json \
+	--load-mode scratch \
+	--tasks train,infer \
+	--levels module-wise,end2end,front-back
+```
+
+### 5.6 DDP Profiling
+
+Two-GPU DDP inference profiling:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 \
+	svrss/profiling_echmo_testbook.py \
+	--cfg svrss/config_files/echmo_itc_scale.json \
+	--load-mode scratch \
+	--tasks infer \
+	--levels end2end
+```
+
+Two-GPU DDP full profiling:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 \
+	svrss/profiling_echmo_testbook.py \
+	--cfg svrss/config_files/echmo_itc_scale.json \
+	--load-mode scratch \
+	--tasks train,infer \
+	--levels module-wise,end2end,front-back
+```
+
+Notes:
+
+- In DDP mode, `batch_size` means per-rank batch size.
+- The report also records `global_batch_size = batch_size_per_rank * world_size`.
+- Only rank 0 writes the Markdown and JSON files.
+
+### 5.7 Output Files
+
+By default, reports are written under:
+
+- `svrss/readme/`
+
+Each run generates:
+
+- one Markdown report
+- one JSON report
+
+You can also override output locations with:
+
+- `--output-dir`
+- `--output-markdown`
+- `--output-json`
+
+## 6. App Visualization
 
 Detailed app document see:
 
 - [svrss/app/README.md](svrss/app/README.md)
 
-### 5.1 Run the Official App (Built-In EchMo Baseline)
+### 6.1 Run the Official App (Built-In EchMo Baseline)
 
 ```bash
 cd svrss/app
@@ -179,7 +320,7 @@ You need:
 
 These weight locations must match MODEL_PATHS in [svrss/app/app.py](svrss/app/app.py).
 
-### 5.2 Extend the App to Full EchMo Family
+### 6.2 Extend the App to Full EchMo Family
 
 The current [svrss/app/app.py](svrss/app/app.py) ships with an EchMo baseline workflow. To enable switching across echmo_deep, echmo_memo, echmo_4moe, echmo_reck, echmo_wide, and rechmo in the UI, use this extension workflow:
 
@@ -202,7 +343,7 @@ This order aligns well with existing training and inference config coverage.
 
 ---
 
-## 6. FAQ
+## 7. FAQ
 
 ### Q1: Why does inference fail with checkpoint-not-found?
 
@@ -237,6 +378,12 @@ cd .. && python -m svrss.infer_echmo --cfg svrss/config_files/echmo_itc_scale.js
 
 # Infer (explicit checkpoint)
 python -m svrss.infer_echmo --cfg svrss/config_files/echmo_reck2_itc_scale.json --model-path /abs/path/to/model.pt
+
+# Profile (single GPU, scratch)
+python svrss/profiling_echmo_testbook.py --cfg svrss/config_files/echmo_itc_scale.json --load-mode scratch
+
+# Profile (DDP, two GPUs)
+CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 svrss/profiling_echmo_testbook.py --cfg svrss/config_files/echmo_itc_scale.json --load-mode scratch --tasks infer --levels end2end
 
 # Visualize
 cd svrss/app && python app.py
