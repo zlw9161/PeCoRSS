@@ -41,8 +41,10 @@ Notes:
 
 ### 2.1 Recommended Environment
 
-- Python >= 3.9
-- PyTorch >= 2.1
+- Python >= 3.12.13
+- PyTorch >= 2.9.0
+- torchvision >= 0.24.0
+- setuptools == 69.5.1 (compile prf_cuda operator related)
 - CUDA is optional (CPU mode is also supported)
 
 ### 2.2 Install Dependencies
@@ -50,7 +52,17 @@ Notes:
 Run from the repository root:
 
 ```bash
-pip install -r requirements.txt
+# install packages and compile `prf_cuda` operator
+# `conda` has been installed as a prerequisite
+bash dev_env_install.sh  
+```
+
+Verify the prf_cuda operator
+```python
+Python 3.12.13 | packaged by Anaconda, Inc. | (main, Mar 19 2026, 20:20:58) [GCC 14.3.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import torch
+>>> import prf_cuda
 ```
 
 ### 2.3 Configure Dataset and Log Paths

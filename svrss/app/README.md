@@ -49,7 +49,7 @@ Weight folder names must match the `MODEL_PATHS` configuration in `app.py`.
 
 ## Requirements
 
-- Python >= 3.9
+- Python >= 3.12.13
 - CUDA (optional, for GPU inference; CPU is also supported)
 
 ## Installation

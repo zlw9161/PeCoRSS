@@ -5,7 +5,7 @@
 
 **Developed by PeCoLab of ISTA@CASIC**
 
-[![Python](https://img.shields.io/badge/Python-3.9.19-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange.svg)](https://pytorch.org/) [![pecorss](https://img.shields.io/badge/PeCoRSS-1.1.3-magenta.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
+[![Python](https://img.shields.io/badge/Python-3.12.13-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.9.0-orange.svg)](https://pytorch.org/) [![pecorss](https://img.shields.io/badge/PeCoRSS-1.1.4-magenta.svg)](./CHANGELOG.md) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE) [![CVPR](https://img.shields.io/badge/CVPR-2023-blue)](https://github.com/zlw9161/PKC) [![NeurIPS](https://img.shields.io/badge/NeurIPS-2024-purple)](https://github.com/zlw9161/AdaPKC)
 
 </div>
 
@@ -57,10 +57,10 @@ This repository hosts state-of-the-art radar semantic segmentation methods from 
 
 | Package | Version |
 |:--------|:-------:|
-| Python | 3.9.19 or higher |
-| PyTorch | 2.1.0 or higher |
-| TorchVision | 0.16.0 or higher |
-| NumPy | 1.26.4 or higher |
+| Python | 3.12.13 or higher |
+| PyTorch | 2.9.0 or higher |
+| TorchVision | 0.24.0 or higher |
+| NumPy | 2.4.6 or higher |
 
 ---
 
@@ -652,7 +652,7 @@ If you find PeCoRSS useful in your research, please consider citing the followin
 | Field | Info |
 |:------|:-----|
 | **Package** | `pecorss` |
-| **Version** | `1.1.3` |
+| **Version** | `1.1.4` |
 | **License** | Apache 2.0 |
 | **Repository** | [https://github.com/zlw9161](https://github.com/zlw9161) |
 | **Contact** | lwzhang9161@126.com |
@@ -679,7 +679,11 @@ For detailed release notes and version history, see [CHANGELOG.md](./CHANGELOG.m
 
 ---
 
-## 📝 Update Log (v1.1.3)
+## 📝 Update Log (v1.1.4)
+
+### Environment Baseline Upgrade and One-Click Setup
+
+- **2026-06-02** — v1.1.4: Upgraded Python → 3.12.13, PyTorch → 2.9.0 (CUDA 12.8), NumPy → 2.4.6 baseline across all docs; added `dev_env_install.sh` for one-click conda environment setup with tiered mirror fallback and `prf_cuda` compilation.
 
 ### ReCK Integration and EchMo Family Updates
 
@@ -704,4 +708,4 @@ For detailed release notes and version history, see [CHANGELOG.md](./CHANGELOG.m
 ### Notes
 
 - Detailed release notes are available in [CHANGELOG.md](./CHANGELOG.md).
-- Current package version is `1.1.3`.
+- Current package version is `1.1.4`.

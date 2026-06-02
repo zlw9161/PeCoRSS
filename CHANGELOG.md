@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.1.4] - 2026-06-02
+
+### Added
+
+- Added one-click development environment setup script:
+  - `dev_env_install.sh`
+
+### Changed
+
+- Upgraded project-wide Python dependency baseline from 3.9.19 to 3.12.13:
+  - `README.md` (badge + requirements table)
+  - `README_EchMo.md` (environment section)
+  - `svrss/app/README.md` (requirements section)
+- Upgraded project-wide PyTorch dependency baseline from 2.1.0 to 2.9.0 (CUDA 12.8), TorchVision from 0.16.0 to 0.24.0, NumPy from 1.26.4 to 2.4.6 in:
+  - `README.md`
+- Replaced bare `pip install -r requirements.txt` with automated `dev_env_install.sh` workflow in `README_EchMo.md`, including tiered PyPI mirror fallback (NJU → Aliyun → Official) and prf_cuda operator compilation.
+- Documented setuptools 69.5.1 pin (compile `prf_cuda` operator) and added prf_cuda import verification snippet in `README_EchMo.md`.
+
+### Version
+
+- Project version bumped to `1.1.4` in:
+  - `README.md`
+  - `setup.py`
+  - `CHANGELOG.md`
+
 ## [1.1.3] - 2026-04-27
 
 ### Added
