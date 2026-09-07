@@ -304,9 +304,15 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
 
   <div class="note" style="margin-top:22px">
     <b>诚实的读数。</b> 真实的 a<sub>τ,q</sub> 只在均匀值 1/n 附近轻微起伏
-    （本序列上偏离量不超过 <span id="devPct">±3</span> 个百分点）。这不是缺陷，而是 θ=1 的 softmax
-    作用在有界分数 s∈[0,1] 上的必然结果，也正是云台的本质：
-    <b>持续的微调，而不是大幅度的甩动</b>。搜索域越干净、目标越连续，这个微调就越稳。
+    （本序列上偏离量不超过 <span id="devPct">±1.1</span> 个百分点）。这<b>不是</b> softmax 被温度压平了：
+    本模型 θ = σ<sub>spa</sub> = <span id="thetaV">0.9</span>，分数有界 s∈[0,1]，理论上足以把两个候选的
+    权重拉开 e<sup>1/θ</sup> ≈ <span id="ratioMax">3.0</span> 倍——余量是够的，它没有去用。
+    近似均匀是<b>数据给出的答案</b>：同一个 3×3 窗口内 9 个候选的分数最多只差
+    <span id="spreadMax">0.15</span>，权重比因此不超过 <span id="ratioObs">1.18</span> 倍。邻域本就连续，
+    9 个候选看上去几乎一样像目标，硬挑一个反而是过拟合噪声。
+    这正是云台的本质：<b>持续的微调，而不是大幅度的甩动</b>。
+    更值得看的是<b>微调发生在哪里</b>：目标点上的分数差是邻域点 / 背景点的
+    <span id="tgtVsBg">3.0</span> 倍——该拉开的地方它确实拉开了。
   </div>
 
   <div class="grid2" style="margin-top:22px">
@@ -338,7 +344,7 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
         <dt>s 的来源</dt><dd>不是相似度 / 内积 / 距离，而是<span class="hl">学出来的前景置信</span> 1−P(背景)</dd>
         <dt>a 的归一化轴</dt><dd>候选轴 q（空间）</dd>
         <dt>w 的归一化轴</dt><dd>历史帧轴 τ（时间）</dd>
-        <dt>θ 温度</dt><dd>仅作用于 a，默认 1.0；w 不除温度</dd>
+        <dt>θ 温度</dt><dd>即 σ<sub>spa</sub>，仅作用于 a（本模型 0.9）；w 不除温度</dd>
         <dt>边界处理</dt><dd>历史特征 replication padding，越界候选复制最近边界</dd>
         <dt>融合方式</dt><dd>沿<span class="hlc">时间轴</span>拼接（非通道轴），再用 (2,1,1) 把 T=2 压成 1</dd>
       </dl>
@@ -1102,7 +1108,18 @@ const STEPS=[
     const probes=DATA.probes, uni=1/N;
     let mx=0;
     probes.forEach(p=>p.attn.forEach(r=>r.forEach(v=>{mx=Math.max(mx,Math.abs(v-uni));})));
-    document.getElementById('devPct').textContent='±'+(mx*100).toFixed(1);
+    // the note quotes real softmax head-room vs. what the data actually asks for
+    const TH=DATA.attn_t||1;
+    const spread=p=>Math.max(...p.score.map(s=>Math.max(...s)-Math.min(...s)));
+    const sTgt=spread(probes.find(p=>p.key==='tgt'));
+    const sOth=Math.max(...probes.filter(p=>p.key!=='tgt').map(spread));
+    const put=(id,v)=>{const e=document.getElementById(id); if(e)e.textContent=v;};
+    put('devPct','±'+(mx*100).toFixed(1));
+    put('thetaV',String(TH));
+    put('ratioMax',Math.exp(1/TH).toFixed(1));
+    put('spreadMax',Math.max(sTgt,sOth).toFixed(2));
+    put('ratioObs',Math.exp(Math.max(sTgt,sOth)/TH).toFixed(2));
+    put('tgtVsBg',(sTgt/(sOth||1)).toFixed(1));
     document.getElementById('attnCap').textContent=`n=${N} 候选 · 均匀值 1/${N}=${uni.toFixed(4)}`;
     const NAME={tgt:'目标点',near:'目标邻域',bg:'背景点'};
     const COL={tgt:'#ffc300',near:'#ed6925',bg:'#4cc9f0'};

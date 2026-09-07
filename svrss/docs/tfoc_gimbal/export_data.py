@@ -30,6 +30,10 @@ CKPT = (r"D:\PaperWork\TFoc\Model\tfoc_pt"
         r"\pdr-ss3-t9-0.90.95-tfoc_sv_v1_revise_range_doppler_e300_lr9.6e-05_s42_0"
         r"\results\model.pt")
 TGT = -1                      # -1 = last frame of the window
+# sigma_spa: the spatial-softmax temperature the run was trained with. It is a
+# plain float on the module (not part of the state_dict), so loading the
+# checkpoint does NOT restore it -- it has to be set by hand to match training.
+ATTN_T = 0.9
 
 # crop covering the whole target track with margin (rows, cols of the 64x800 RD)
 R0, R1, C0, C1 = 12, 44, 72, 208
@@ -68,6 +72,9 @@ def main() -> None:
     info = eng.load_checkpoint(CKPT)
     print("checkpoint:", info.message)
     eng.set_tgt(TGT)
+    tfoc = eng.net.encoding_branch.tfoc_conv_block
+    print(f"attn_temperature: {tfoc.attn_temperature} -> {ATTN_T}")
+    tfoc.attn_temperature = float(ATTN_T)
 
     cap = eng.capture_tfoc(x)
     out = eng.forward(x)
@@ -127,7 +134,7 @@ def main() -> None:
         "crop": {"r0": R0, "c0": C0, "h": ch, "w": cw, "H": h, "W": w},
         "dims": {"t": t, "n_hist": n_hist, "k_n": k_n, "pad": pad, "n": n,
                  "c": d["c"], "h": h, "w": w, "n_input": n_frames},
-        "tgt_i": tgt_i, "tgt_in": tgt_in,
+        "tgt_i": tgt_i, "tgt_in": tgt_in, "attn_t": float(ATTN_T),
         "hist_idx": hist_idx, "seg_iou": ious,
         "track": track,
         "probes": probes,

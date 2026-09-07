@@ -77,8 +77,16 @@ If `data.json` is missing, `build.py` still emits a page; §4 (real data) is omi
 ## Notes
 
 - §2’s “+X pt” gain is a **schematic** purity difference, not a dataset mIoU/Dice.
-- §4 numbers are a real forward pass; spatial weights stay near uniform \(1/n\)
-  (gentle reweighting under \(\theta=1\)), which is intentional in the gimbal narrative.
+- §4 numbers are a real forward pass; spatial weights stay near uniform \(1/n\).
+  That is **not** a flat-softmax artefact: with \(\theta=\sigma_{spa}=0.9\) and
+  \(s\in[0,1]\) the head-room is \(e^{1/\theta}\approx 3.0\times\), but the nine
+  candidates of a 3×3 window differ by at most \(0.15\) in score, so the observed
+  weight ratio is \(\le 1.18\times\). The largest spread sits on the target point
+  (~3× the neighbour/clutter probes) — the reweighting is gentle *and* targeted.
+- `attn_temperature` (\(\sigma_{spa}\)) is a plain float on `TFocConvV1`, **not**
+  part of the `state_dict`, so a checkpoint never restores it. `export_data.py`
+  sets it explicitly via `ATTN_T`; it must match the value used for training
+  (this run: `0.9`, while the model source currently defaults to `1.0`).
 - The supervised target frame is resolved from per-frame IoU against the prediction,
   not from the demo’s temporal-RF centre offset. With the current checkpoint the
   anchor is the **last** input frame (preset → `#8`, IoU `1.000`, all other frames `0`),
