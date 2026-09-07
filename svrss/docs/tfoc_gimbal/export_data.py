@@ -24,6 +24,13 @@ from svrss.demo.model_registry import get_spec
 
 OUT = Path(__file__).resolve().parent / "data.json"
 
+# Checkpoint used for the real-data section. This model anchors on the LAST
+# frame of the input window (the earlier one anchored on the middle frame).
+CKPT = (r"D:\PaperWork\TFoc\Model\tfoc_pt"
+        r"\pdr-ss3-t9-0.90.95-tfoc_sv_v1_revise_range_doppler_e300_lr9.6e-05_s42_0"
+        r"\results\model.pt")
+TGT = -1                      # -1 = last frame of the window
+
 # crop covering the whole target track with margin (rows, cols of the 64x800 RD)
 R0, R1, C0, C1 = 12, 44, 72, 208
 
@@ -53,14 +60,14 @@ def _energy(feat: np.ndarray) -> np.ndarray:
 def main() -> None:
     seq = du.load_preset()
     n_frames = seq.num_frames
-    rd, masks, ids = du.select_window(seq, n_frames)
+    rd, masks, ids, _ = du.select_window(seq, n_frames)
     x = du.build_input_tensor(rd, seq.signal_type)
 
     spec = get_spec("tfoc_sv_v1_revise")
     eng = InferenceEngine(spec, n_frames=n_frames, device="cpu")
-    info = eng.load_checkpoint(None)
+    info = eng.load_checkpoint(CKPT)
     print("checkpoint:", info.message)
-    eng.set_tgt(spec.default_tgt)
+    eng.set_tgt(TGT)
 
     cap = eng.capture_tfoc(x)
     out = eng.forward(x)

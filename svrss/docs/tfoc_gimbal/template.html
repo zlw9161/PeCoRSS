@@ -1024,7 +1024,7 @@ const STEPS=[
 
   /* ---- 胶片：9 帧真实 RD ---- */
   (function(){
-    const W=1260,H=540;
+    const W=1260,H=462;
     let idx=DATA.tgt_in, playing=true, acc=0, last=0, trace=true;
     const el=document.getElementById('filmIdx'), val=document.getElementById('filmVal');
     el.oninput=()=>{idx=+el.value; val.textContent='#'+idx; playing=false;
@@ -1036,9 +1036,11 @@ const STEPS=[
       trace=!trace; e.target.classList.toggle('on',trace);};
     document.getElementById('traceBtn').classList.add('on');
     const tk=DATA.track;
-    document.getElementById('filmCap').textContent=
+    document.getElementById('filmCap').innerHTML=
       `序列 ${DATA.seq} · RD ${C.H}×${C.W}，此处裁剪 ${CH}×${CW}（行 ${C.r0}–${C.r0+CH}，列 ${C.c0}–${C.c0+CW}）。`
-      +` 目标以约 ${((tk[8][1]-tk[0][1])/8).toFixed(1)} 列/帧匀速右移；目标帧由预测与真值的逐帧 IoU 反解得到（#${DATA.tgt_in}，IoU=${DATA.seg_iou[DATA.tgt_in].toFixed(3)}）。`;
+      +` 目标以约 ${((tk[8][1]-tk[0][1])/8).toFixed(1)} 列/帧匀速右移。该模型以窗口`
+      +`<b>最后一帧</b>为锚点：把预测逐帧与真值比对，IoU 只在 #${DATA.tgt_in} 上非零`
+      +`（${DATA.seg_iou[DATA.tgt_in].toFixed(3)}），其余 8 帧全为 0。`;
 
     stage('cvFilm',W,H,(g,t)=>{
       if(!last)last=t; const dt=Math.min(t-last,.05); last=t;
@@ -1085,13 +1087,13 @@ const STEPS=[
       g.fillStyle='#9e9ec8'; g.font='600 13px ui-monospace,monospace';
       g.fillText('输入帧 #'+idx+(idx===DATA.tgt_in?'   ← 目标帧（被监督的那一帧）':''),x0,60);
       g.fillStyle='#6c6c96'; g.font='500 11px ui-monospace,monospace';
-      g.fillText('9 个输入帧经两层无填充时间卷积压成 5 个时间位置：最后一个作目标，其余 4 个作历史 τ=0…3',x0,H-16);
+      g.fillText(`9 个输入帧经两层无填充时间卷积压成 5 个时间位置：最后一个作目标（时间感受野正好以 #${DATA.tgt_in} 收尾），其余 4 个作历史 τ=0…3`,x0,H-16);
     });
   })();
 
   /* ---- 真实 a 的 3×3 网格 ---- */
   (function(){
-    const W=760,H=475;
+    const W=760,H=548;
     let dev=true;
     document.getElementById('devBtn').onclick=e=>{
       dev=!dev; e.target.classList.toggle('on',dev);
@@ -1145,7 +1147,7 @@ const STEPS=[
 
   /* ---- 真实 time_w ---- */
   (function(){
-    const W=760,H=475;
+    const W=760,H=548;
     const probes=DATA.probes;
     const NAME={tgt:'目标点',near:'目标邻域',bg:'背景点'};
     const COL={tgt:'#ffc300',near:'#ed6925',bg:'#4cc9f0'};
@@ -1159,7 +1161,7 @@ const STEPS=[
       g.fillStyle='#9e9ec8'; g.font='600 11.5px ui-monospace,monospace';
       for(let h=0;h<NH;h++) g.fillText(TAU[h], x0+h*(bw+16)+bw/2-18, y0-12);
       probes.forEach((p,pi)=>{
-        const y=y0+pi*118, hgt=76;
+        const y=y0+pi*150, hgt=96;
         g.fillStyle=COL[p.key]; g.font='600 12px ui-monospace,monospace';
         g.fillText(NAME[p.key],14,y+hgt/2);
         for(let h=0;h<NH;h++){

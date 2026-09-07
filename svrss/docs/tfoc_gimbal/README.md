@@ -58,7 +58,9 @@ svrss/docs/
 ## Rebuild (optional)
 
 Needs the `svrss` package, the demo preset under `svrss/demo/assets/preset/`,
-and a trained `tfoc_sv_v1_revise` checkpoint resolvable by the demo registry.
+and a trained TFoC checkpoint. The path is the `CKPT` constant at the top of
+`export_data.py`; the shipped `data.json` comes from the **last-frame-anchored**
+model (`pdr-ss3-t9-0.90.95-…-s42_0`, `best_dice = 0.809`).
 
 From the **repo root** (`PeCoRSS` / `Code`):
 
@@ -77,8 +79,10 @@ If `data.json` is missing, `build.py` still emits a page; §4 (real data) is omi
 - §2’s “+X pt” gain is a **schematic** purity difference, not a dataset mIoU/Dice.
 - §4 numbers are a real forward pass; spatial weights stay near uniform \(1/n\)
   (gentle reweighting under \(\theta=1\)), which is intentional in the gimbal narrative.
-- The supervised target frame is resolved from per-frame IoU against the prediction
-  (preset → input frame `#4`), not from the demo’s temporal-RF centre offset.
+- The supervised target frame is resolved from per-frame IoU against the prediction,
+  not from the demo’s temporal-RF centre offset. With the current checkpoint the
+  anchor is the **last** input frame (preset → `#8`, IoU `1.000`, all other frames `0`),
+  so the target feature position’s temporal receptive field ends exactly on it.
 
 ## License
 
