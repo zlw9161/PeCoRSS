@@ -29,9 +29,28 @@ section+section{border-top:1px solid rgba(157,78,221,.14)}
 }
 .eyebrow::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--purple),transparent)}
 h2{font-size:clamp(26px,3.4vw,40px);margin:0 0 10px;letter-spacing:-.01em;font-weight:700}
-h2 .en{display:block;font:400 14px/1.6 var(--mono);color:var(--dim);letter-spacing:.06em;margin-top:6px}
+h2 .sub{display:block;font:400 14px/1.6 var(--mono);color:var(--dim);letter-spacing:.06em;margin-top:6px}
 .lede{font-size:17px;color:var(--muted);max-width:74ch;margin:0 0 34px}
 .lede b{color:var(--text);font-weight:600}
+/* ---------- i18n ---------- */
+html.lang-zh .L-en, html.lang-en .L-zh{display:none!important}
+#langToggle{
+  position:fixed; top:18px; right:18px; z-index:1000;
+  display:flex; align-items:center; gap:0; padding:3px;
+  background:rgba(15,15,35,.82); border:1px solid rgba(157,78,221,.45);
+  border-radius:999px; backdrop-filter:blur(10px);
+  box-shadow:0 0 22px rgba(157,78,221,.22); cursor:pointer; user-select:none;
+}
+#langToggle .opt{
+  font:600 12px/1 var(--mono); letter-spacing:.08em; color:var(--dim);
+  padding:8px 12px; border-radius:999px; transition:.18s;
+}
+#langToggle .opt.on{
+  color:#fff; background:linear-gradient(120deg,var(--purple),var(--orange));
+  box-shadow:0 0 12px rgba(255,195,0,.28);
+}
+#langToggle:hover{border-color:rgba(177,92,255,.7)}
+@media(max-width:560px){#langToggle{top:10px;right:10px}}
 .hl{color:var(--amber)}.hlp{color:var(--violet)}.hlr{color:var(--red)}.hlc{color:var(--cyan)}
 .card{background:linear-gradient(160deg,rgba(157,78,221,.07),rgba(15,15,35,.7));
   border:1px solid var(--border); border-radius:16px; padding:22px}
@@ -124,20 +143,27 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
 </style>
 </head>
 <body>
+<button type="button" id="langToggle" aria-label="Language">
+  <span class="opt on" data-lang="zh">中文</span>
+  <span class="opt" data-lang="en">EN</span>
+</button>
 
 <!-- ══════════════ HERO ══════════════ -->
 <section id="hero">
   <canvas id="heroCv"></canvas>
   <div class="heroIn">
     <h1>TFoC</h1>
-    <div class="zh">时空聚焦卷积</div>
-    <div class="en">TEMPORAL-SPATIAL FOCUSING CONVOLUTION</div>
-    <div class="tagline">给卷积装一台云台</div>
+    <div class="zh L-zh">时空聚焦卷积</div>
+    <div class="zh L-en">Temporal-Spatial Focusing Convolution</div>
+    <div class="en L-zh">TEMPORAL-SPATIAL FOCUSING CONVOLUTION</div>
+    <div class="en L-en">时空聚焦卷积</div>
+    <div class="tagline L-zh">给卷积装一台云台</div>
+    <div class="tagline L-en">A gimbal for convolution</div>
     <div class="chips">
-      <div class="chip"><b>3×3</b><span>搜索域 k<sub>n</sub></span></div>
-      <div class="chip"><b>4</b><span>历史帧 τ</span></div>
-      <div class="chip"><b>Σa=1</b><span>凸组合</span></div>
-      <div class="chip"><b>1</b><span>次卷积的感受野</span></div>
+      <div class="chip"><b>3×3</b><span class="L-zh">搜索域 k<sub>n</sub></span><span class="L-en">search k<sub>n</sub></span></div>
+      <div class="chip"><b>4</b><span class="L-zh">历史帧 τ</span><span class="L-en">history frames τ</span></div>
+      <div class="chip"><b>Σa=1</b><span class="L-zh">凸组合</span><span class="L-en">convex combo</span></div>
+      <div class="chip"><b>1</b><span class="L-zh">次卷积的感受野</span><span class="L-en">RF per convolution</span></div>
     </div>
   </div>
   <div class="scroller">SCROLL ↓</div>
@@ -145,101 +171,165 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
 
 <!-- ══════════════ §1 云台原理 ══════════════ -->
 <section id="s1"><div class="wrap reveal">
-  <div class="eyebrow">01 &nbsp;/&nbsp; 直觉</div>
-  <h2>云台做的三件事<span class="en">What a gimbal actually does</span></h2>
-  <p class="lede">
+  <div class="eyebrow L-zh">01 &nbsp;/&nbsp; 直觉</div>
+  <div class="eyebrow L-en">01 &nbsp;/&nbsp; Intuition</div>
+  <h2>
+    <span class="L-zh">云台做的三件事<span class="sub">What a gimbal actually does</span></span>
+    <span class="L-en">What a gimbal actually does<span class="sub">云台做的三件事</span></span>
+  </h2>
+  <p class="lede L-zh">
     云台<b>不会</b>让镜头去追一个遥远的东西。它只做三件小事，并且每一帧都重复一次：
     <span class="hl">测出主体偏离画面中心多少</span>、<span class="hlp">反向补偿这个偏差</span>、
     <span class="hlc">持续跟随而不是一次性归位</span>。
     结果是主体永远稳稳停在画面中央，滑动的是背景。
   </p>
+  <p class="lede L-en">
+    A gimbal does <b>not</b> chase a distant object with the lens. It repeats three small acts every frame:
+    <span class="hl">measure how far the subject drifts from the frame centre</span>,
+    <span class="hlp">compensate that offset in the opposite direction</span>, and
+    <span class="hlc">keep following instead of snapping once</span>.
+    The subject stays locked in the centre; the background slides.
+  </p>
   <div class="grid2">
     <div class="card">
       <canvas id="cvShake" style="aspect-ratio:16/11"></canvas>
-      <div class="cap">刚性支架 · 镜头焊死在机身上</div>
+      <div class="cap L-zh">刚性支架 · 镜头焊死在机身上</div>
+      <div class="cap L-en">Rigid mount · lens welded to the body</div>
     </div>
     <div class="card">
       <canvas id="cvGimbal" style="aspect-ratio:16/11"></canvas>
-      <div class="cap">三轴云台 · 每帧反向补偿</div>
+      <div class="cap L-zh">三轴云台 · 每帧反向补偿</div>
+      <div class="cap L-en">3-axis gimbal · per-frame counter-compensation</div>
     </div>
   </div>
   <div class="ctl">
-    <label>机身抖动</label><input type="range" id="shakeAmp" min="0" max="100" value="55">
+    <label><span class="L-zh">机身抖动</span><span class="L-en">Body shake</span></label>
+    <input type="range" id="shakeAmp" min="0" max="100" value="55">
     <span class="val" id="shakeVal">0.55</span>
-    <label>跟随强度 k</label><input type="range" id="gimK" min="5" max="60" value="26">
+    <label><span class="L-zh">跟随强度 k</span><span class="L-en">Follow gain k</span></label>
+    <input type="range" id="gimK" min="5" max="60" value="26">
     <span class="val" id="gimVal">0.26</span>
   </div>
-  <div class="cap">左右两台相机拍的是同一个主体、经历同样的抖动。左边主体在画面里乱窜，右边始终居中。</div>
+  <div class="cap L-zh">左右两台相机拍的是同一个主体、经历同样的抖动。左边主体在画面里乱窜，右边始终居中。</div>
+  <div class="cap L-en">Both cameras see the same subject under the same shake. Left: the subject jumps around. Right: it stays centred.</div>
 
   <div class="card" style="margin-top:30px">
-    <div class="eyebrow" style="margin-bottom:12px">映射到卷积</div>
+    <div class="eyebrow L-zh" style="margin-bottom:12px">映射到卷积</div>
+    <div class="eyebrow L-en" style="margin-bottom:12px">Mapped onto convolution</div>
     <div class="grid4">
-      <div><span class="tag a">测偏差</span><p style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
-        在 k<sub>n</sub>×k<sub>n</sub> 搜索域里，对每个候选算一个「它有多像目标」的置信 s。</p></div>
-      <div><span class="tag p">反向补偿</span><p style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
-        按置信做 softmax 得到 a<sub>τ,q</sub>，加权求和——重心自动挪向目标真正所在的候选。</p></div>
-      <div><span class="tag c">持续跟随</span><p style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
-        每一个历史帧独立做一次，再按时间置信 w<sub>τ</sub> 决定哪几帧值得信。</p></div>
-      <div><span class="tag r">稳定输出</span><p style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
-        对齐后的历史与目标帧拼接，被<b class="hlr">一次</b> (2,1,1) 卷积收进同一个感受野。</p></div>
+      <div><span class="tag a L-zh">测偏差</span><span class="tag a L-en">Measure</span>
+        <p class="L-zh" style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
+        在 k<sub>n</sub>×k<sub>n</sub> 搜索域里，对每个候选算一个「它有多像目标」的置信 s。</p>
+        <p class="L-en" style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
+        Inside a k<sub>n</sub>×k<sub>n</sub> search window, score each candidate with a confidence s: how target-like it is.</p></div>
+      <div><span class="tag p L-zh">反向补偿</span><span class="tag p L-en">Compensate</span>
+        <p class="L-zh" style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
+        按置信做 softmax 得到 a<sub>τ,q</sub>，加权求和——重心自动挪向目标真正所在的候选。</p>
+        <p class="L-en" style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
+        Softmax the scores into a<sub>τ,q</sub> and reweight — the mass shifts to where the target actually is.</p></div>
+      <div><span class="tag c L-zh">持续跟随</span><span class="tag c L-en">Follow</span>
+        <p class="L-zh" style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
+        每一个历史帧独立做一次，再按时间置信 w<sub>τ</sub> 决定哪几帧值得信。</p>
+        <p class="L-en" style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
+        Repeat independently on every history frame, then let temporal weights w<sub>τ</sub> decide which frames to trust.</p></div>
+      <div><span class="tag r L-zh">稳定输出</span><span class="tag r L-en">Stable out</span>
+        <p class="L-zh" style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
+        对齐后的历史与目标帧拼接，被<b class="hlr">一次</b> (2,1,1) 卷积收进同一个感受野。</p>
+        <p class="L-en" style="margin:10px 0 0;font-size:14.5px;color:var(--muted)">
+        Concatenate the aligned history with the target and fold them into <b class="hlr">one</b> (2,1,1) receptive field.</p></div>
     </div>
   </div>
 </div></section>
 
 <!-- ══════════════ §2 刚性卷积的困境 ══════════════ -->
 <section id="s2"><div class="wrap reveal">
-  <div class="eyebrow">02 &nbsp;/&nbsp; 问题</div>
-  <h2>为什么普通 3D 卷积做不到<span class="en">The rigid receptive field problem</span></h2>
-  <p class="lede">
+  <div class="eyebrow L-zh">02 &nbsp;/&nbsp; 问题</div>
+  <div class="eyebrow L-en">02 &nbsp;/&nbsp; Problem</div>
+  <h2>
+    <span class="L-zh">为什么普通 3D 卷积做不到<span class="sub">The rigid receptive field problem</span></span>
+    <span class="L-en">The rigid receptive field problem<span class="sub">为什么普通 3D 卷积做不到</span></span>
+  </h2>
+  <p class="lede L-zh">
     3D 卷积在时间上也能看到邻帧的 3×3 邻域——<b>覆盖范围并不是问题</b>。
     问题在于它的权重是<span class="hlr">焊死的</span>：不管目标这一帧漂到了窗口的哪个角落，
     卷积核都按同一组固定系数把目标和杂波拌在一起。TFoC 的权重则由内容现算，
     并且被约束成一个<span class="hl">和为 1 的凸组合</span>。
   </p>
+  <p class="lede L-en">
+    A 3D convolution can already see the 3×3 neighbourhood of neighbouring frames —
+    <b>coverage is not the issue</b>. The issue is that its weights are
+    <span class="hlr">welded shut</span>: no matter which corner of the window the target drifts into,
+    the same fixed coefficients mix target and clutter. TFoC recomputes the weights from content
+    and constrains them to a <span class="hl">convex combination that sums to 1</span>.
+  </p>
   <div class="card">
     <canvas id="cvRigid" style="aspect-ratio:24/9"></canvas>
     <div class="ctl">
-      <label>目标漂移 d (像素/帧)</label><input type="range" id="drift" min="0" max="220" value="120">
+      <label><span class="L-zh">目标漂移 d (像素/帧)</span><span class="L-en">Target drift d (px/frame)</span></label>
+      <input type="range" id="drift" min="0" max="220" value="120">
       <span class="val" id="driftVal">1.20</span>
-      <label>杂波强度</label><input type="range" id="clut" min="0" max="100" value="42">
+      <label><span class="L-zh">杂波强度</span><span class="L-en">Clutter</span></label>
+      <input type="range" id="clut" min="0" max="100" value="42">
       <span class="val" id="clutVal">0.42</span>
     </div>
     <div class="legend">
-      <span><i style="background:var(--red)"></i>固定核 Conv3d</span>
-      <span><i style="background:var(--amber)"></i>自适应权重 TFoC</span>
-      <span><i style="background:var(--violet)"></i>目标能量</span>
-      <span><i style="background:var(--dim)"></i>杂波能量</span>
+      <span><i style="background:var(--red)"></i><span class="L-zh">固定核 Conv3d</span><span class="L-en">Fixed Conv3d</span></span>
+      <span><i style="background:var(--amber)"></i><span class="L-zh">自适应权重 TFoC</span><span class="L-en">Adaptive TFoC</span></span>
+      <span><i style="background:var(--violet)"></i><span class="L-zh">目标能量</span><span class="L-en">Target energy</span></span>
+      <span><i style="background:var(--dim)"></i><span class="L-zh">杂波能量</span><span class="L-en">Clutter energy</span></span>
     </div>
-    <div class="cap">示意演算：四个历史帧上目标依次后退 d、2d、3d、4d 个像素，两种权重从同一个 3×3 窗口取值。</div>
+    <div class="cap L-zh">示意演算：四个历史帧上目标依次后退 d、2d、3d、4d 个像素，两种权重从同一个 3×3 窗口取值。</div>
+    <div class="cap L-en">Schematic: the target retreats by d, 2d, 3d, 4d pixels across four history frames; both weightings read the same 3×3 window.</div>
   </div>
 
   <div class="grid4" style="margin-top:26px">
-    <div class="card"><span class="tag a">自适应</span>
-      <p style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
+    <div class="card"><span class="tag a L-zh">自适应</span><span class="tag a L-en">Adaptive</span>
+      <p class="L-zh" style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
         Conv3d 是 <span class="fml" style="padding:2px 6px;font-size:13px">Σ W<sub>q</sub>·x<sub>q</sub></span>，W 与输入无关；
-        TFoC 是 <span class="fml" style="padding:2px 6px;font-size:13px">Σ a<sub>q</sub>(x)·x<sub>q</sub></span>，权重随目标而动。</p></div>
-    <div class="card"><span class="tag p">归一化</span>
-      <p style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
+        TFoC 是 <span class="fml" style="padding:2px 6px;font-size:13px">Σ a<sub>q</sub>(x)·x<sub>q</sub></span>，权重随目标而动。</p>
+      <p class="L-en" style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
+        Conv3d is <span class="fml" style="padding:2px 6px;font-size:13px">Σ W<sub>q</sub>·x<sub>q</sub></span> with W independent of the input;
+        TFoC is <span class="fml" style="padding:2px 6px;font-size:13px">Σ a<sub>q</sub>(x)·x<sub>q</sub></span>, weights that move with the target.</p></div>
+    <div class="card"><span class="tag p L-zh">归一化</span><span class="tag p L-en">Normalized</span>
+      <p class="L-zh" style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
         Σa<sub>q</sub>=1 使输出停在特征流形上：搜索域变大也不会稀释能量，
-        而卷积核变大只会按固定比例掺进更多杂波。</p></div>
-    <div class="card"><span class="tag c">解耦</span>
-      <p style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
+        而卷积核变大只会按固定比例掺进更多杂波。</p>
+      <p class="L-en" style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
+        Σa<sub>q</sub>=1 keeps the output on the feature manifold: a larger search window does not dilute energy,
+        while a larger fixed kernel only mixes in more clutter at fixed ratios.</p></div>
+    <div class="card"><span class="tag c L-zh">解耦</span><span class="tag c L-en">Decoupled</span>
+      <p class="L-zh" style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
         搜索域 k<sub>n</sub> 与融合卷积解耦：3×3 → 5×5 融合层参数量<b>不变</b>；
-        卷积核扩大则参数按 k² 增长。</p></div>
-    <div class="card"><span class="tag r">时间维</span>
-      <p style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
+        卷积核扩大则参数按 k² 增长。</p>
+      <p class="L-en" style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
+        Search size k<sub>n</sub> is decoupled from the fusion convolution: 3×3 → 5×5 leaves fusion parameters
+        <b>unchanged</b>; enlarging a Conv kernel grows parameters by k².</p></div>
+    <div class="card"><span class="tag r L-zh">时间维</span><span class="tag r L-en">Temporal</span>
+      <p class="L-zh" style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
         额外的 w<sub>τ</sub> 让「这一帧看得清不清楚」参与决策——
-        固定卷积核对每个历史帧一视同仁。</p></div>
+        固定卷积核对每个历史帧一视同仁。</p>
+      <p class="L-en" style="margin:12px 0 0;font-size:14.5px;color:var(--muted)">
+        Extra weights w<sub>τ</sub> let “how clear is this frame?” enter the decision —
+        a fixed kernel treats every history frame the same.</p></div>
   </div>
 </div></section>
 
 <!-- ══════════════ §3 五步流水线 ══════════════ -->
 <section id="s3"><div class="wrap reveal">
-  <div class="eyebrow">03 &nbsp;/&nbsp; 机理</div>
-  <h2>TFoC 的五步<span class="en">The TFoC forward pass, step by step</span></h2>
-  <p class="lede">
+  <div class="eyebrow L-zh">03 &nbsp;/&nbsp; 机理</div>
+  <div class="eyebrow L-en">03 &nbsp;/&nbsp; Mechanism</div>
+  <h2>
+    <span class="L-zh">TFoC 的五步<span class="sub">The TFoC forward pass, step by step</span></span>
+    <span class="L-en">The TFoC forward pass, step by step<span class="sub">TFoC 的五步</span></span>
+  </h2>
+  <p class="lede L-zh">
     输入 9 帧经两层无填充时间卷积后剩下 <b>t=5</b> 个时间位置，最后一个作目标帧，
     其余 4 个作历史帧。下面每一步都对应真实实现里的一行代码。
+  </p>
+  <p class="lede L-en">
+    Nine input frames pass through two unpadded temporal convolutions and leave
+    <b>t=5</b> temporal positions: the last is the target frame, the other four are history.
+    Each step below maps to one line in the real implementation.
   </p>
 
   <div class="steps" id="stepBar"></div>
@@ -260,7 +350,8 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
       <div class="shape" style="margin-top:14px" id="shapeBox"></div>
     </div>
     <div class="card">
-      <div class="eyebrow" style="margin-bottom:12px">云台类比</div>
+      <div class="eyebrow L-zh" style="margin-bottom:12px">云台类比</div>
+      <div class="eyebrow L-en" style="margin-bottom:12px">Gimbal analogy</div>
       <p class="gim" id="gimBox"></p>
     </div>
   </div>
@@ -268,18 +359,27 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
 
 <!-- ══════════════ §4 真实数据 ══════════════ -->
 <section id="s4"><div class="wrap reveal">
-  <div class="eyebrow">04 &nbsp;/&nbsp; 真实数据</div>
-  <h2>真实序列上的 TFoC<span class="en">Real internals from the trained checkpoint</span></h2>
-  <p class="lede" id="realLede">
+  <div class="eyebrow L-zh">04 &nbsp;/&nbsp; 真实数据</div>
+  <div class="eyebrow L-en">04 &nbsp;/&nbsp; Real data</div>
+  <h2>
+    <span class="L-zh">真实序列上的 TFoC<span class="sub">Real internals from the trained checkpoint</span></span>
+    <span class="L-en">Real internals from the trained checkpoint<span class="sub">真实序列上的 TFoC</span></span>
+  </h2>
+  <p class="lede L-zh" id="realLede">
     下面全部是<b>真实数字</b>：预设的 Ku 波段海面无人机序列，9 帧 RD 图，
     经训练好的 <span class="hlp">TFoC</span> 前向一次后抓取的 TFocConv 内部张量。
+  </p>
+  <p class="lede L-en" id="realLedeEn">
+    Everything below is <b>real</b>: a preset Ku-band sea-surface UAV sequence, nine RD maps,
+    and the TFocConv tensors captured from one forward pass of the trained <span class="hlp">TFoC</span>.
   </p>
 
   <div class="card">
     <canvas id="cvFilm" style="aspect-ratio:21/9"></canvas>
     <div class="ctl">
       <button class="btn on" id="filmBtn">⏸ 暂停</button>
-      <label>帧</label><input type="range" id="filmIdx" min="0" max="8" value="6">
+      <label><span class="L-zh">帧</span><span class="L-en">Frame</span></label>
+      <input type="range" id="filmIdx" min="0" max="8" value="6">
       <span class="val" id="filmVal">#6</span>
       <button class="btn" id="traceBtn">显示航迹</button>
     </div>
@@ -288,7 +388,8 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
 
   <div class="grid2" style="margin-top:22px">
     <div class="card">
-      <div class="eyebrow" style="margin-bottom:12px">空间聚焦 a<sub>τ,q</sub> · 真实权重</div>
+      <div class="eyebrow L-zh" style="margin-bottom:12px">空间聚焦 a<sub>τ,q</sub> · 真实权重</div>
+      <div class="eyebrow L-en" style="margin-bottom:12px">Spatial focus a<sub>τ,q</sub> · real weights</div>
       <canvas id="cvAttn" style="aspect-ratio:16/10"></canvas>
       <div class="ctl">
         <button class="btn on" id="devBtn">显示偏离均匀量</button>
@@ -296,13 +397,14 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
       </div>
     </div>
     <div class="card">
-      <div class="eyebrow" style="margin-bottom:12px">时间聚焦 w<sub>τ</sub> · 真实权重</div>
+      <div class="eyebrow L-zh" style="margin-bottom:12px">时间聚焦 w<sub>τ</sub> · 真实权重</div>
+      <div class="eyebrow L-en" style="margin-bottom:12px">Temporal focus w<sub>τ</sub> · real weights</div>
       <canvas id="cvTime" style="aspect-ratio:16/10"></canvas>
       <div class="cap" id="timeCap"></div>
     </div>
   </div>
 
-  <div class="note" style="margin-top:22px">
+  <div class="note L-zh" style="margin-top:22px" id="honestNote">
     <b>诚实的读数。</b> 真实的 a<sub>τ,q</sub> 只在均匀值 1/n 附近轻微起伏
     （本序列上偏离量不超过 <span id="devPct">±1.1</span> 个百分点）。这<b>不是</b> softmax 被温度压平了：
     本模型 θ = σ<sub>spa</sub> = <span id="thetaV">0.9</span>，分数有界 s∈[0,1]，理论上足以把两个候选的
@@ -314,15 +416,33 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
     更值得看的是<b>微调发生在哪里</b>：目标点上的分数差是邻域点 / 背景点的
     <span id="tgtVsBg">3.0</span> 倍——该拉开的地方它确实拉开了。
   </div>
+  <div class="note L-en" style="margin-top:22px" id="honestNoteEn">
+    <b>An honest reading.</b> Real a<sub>τ,q</sub> only ripples around the uniform value 1/n
+    (deviation ≤ <span id="devPctEn">±1.1</span> percentage points on this sequence). This is
+    <b>not</b> a flat softmax caused by temperature: here θ = σ<sub>spa</sub> =
+    <span id="thetaVEn">0.9</span> and scores are bounded s∈[0,1], which is already enough to pull
+    two candidates apart by e<sup>1/θ</sup> ≈ <span id="ratioMaxEn">3.0</span>× — the headroom is there;
+    the model simply does not use it. Near-uniformity is the <b>answer the data asks for</b>:
+    inside one 3×3 window the nine candidates differ by at most
+    <span id="spreadMaxEn">0.15</span> in score, so the weight ratio stays ≤
+    <span id="ratioObsEn">1.18</span>×. Neighbours are continuous; all nine look almost equally
+    target-like, and forcing a hard pick would overfit noise.
+    That is the gimbal’s nature: <b>continuous fine-tuning, not large swings</b>.
+    More telling is <b>where</b> the fine-tuning happens: the score spread on the target point is
+    <span id="tgtVsBgEn">3.0</span>× that of the neighbour / background probes — it opens up where it should.
+  </div>
 
   <div class="grid2" style="margin-top:22px">
     <div class="card">
-      <div class="eyebrow" style="margin-bottom:12px">特征能量 · 目标帧 vs 聚焦结果</div>
+      <div class="eyebrow L-zh" style="margin-bottom:12px">特征能量 · 目标帧 vs 聚焦结果</div>
+      <div class="eyebrow L-en" style="margin-bottom:12px">Feature energy · target vs. focusing result</div>
       <canvas id="cvFeat" style="aspect-ratio:16/10"></canvas>
-      <div class="cap">上：目标帧原始特征 x<sup>tgt</sup> 的通道 L2；下：时空聚焦后的历史特征 x<sup>hist</sup><sub>final</sub>。两者沿时间轴拼接后被 (2,1,1) 卷积融合。</div>
+      <div class="cap L-zh">上：目标帧原始特征 x<sup>tgt</sup> 的通道 L2；下：时空聚焦后的历史特征 x<sup>hist</sup><sub>final</sub>。两者沿时间轴拼接后被 (2,1,1) 卷积融合。</div>
+      <div class="cap L-en">Top: channel-L2 of the raw target feature x<sup>tgt</sup>. Bottom: history feature after spatiotemporal focusing, x<sup>hist</sup><sub>final</sub>. They are concatenated along time and fused by a (2,1,1) convolution.</div>
     </div>
     <div class="card">
-      <div class="eyebrow" style="margin-bottom:12px">分割输出 vs 真值</div>
+      <div class="eyebrow L-zh" style="margin-bottom:12px">分割输出 vs 真值</div>
+      <div class="eyebrow L-en" style="margin-bottom:12px">Segmentation vs. ground truth</div>
       <canvas id="cvSeg" style="aspect-ratio:16/11"></canvas>
       <div class="cap" id="segCap"></div>
     </div>
@@ -331,16 +451,22 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
 
 <!-- ══════════════ §5 数学 ══════════════ -->
 <section id="s5"><div class="wrap reveal">
-  <div class="eyebrow">05 &nbsp;/&nbsp; 完整定义</div>
-  <h2>一页纸的 TFoC<span class="en">The whole operator on one page</span></h2>
-  <p class="lede">符号：b 批、c 通道、t 时间位置、p=(i,j) 空间位置、τ 历史帧序号、q 候选序号、n=k<sub>n</sub>²。</p>
+  <div class="eyebrow L-zh">05 &nbsp;/&nbsp; 完整定义</div>
+  <div class="eyebrow L-en">05 &nbsp;/&nbsp; Full definition</div>
+  <h2>
+    <span class="L-zh">一页纸的 TFoC<span class="sub">The whole operator on one page</span></span>
+    <span class="L-en">The whole operator on one page<span class="sub">一页纸的 TFoC</span></span>
+  </h2>
+  <p class="lede L-zh">符号：b 批、c 通道、t 时间位置、p=(i,j) 空间位置、τ 历史帧序号、q 候选序号、n=k<sub>n</sub>²。</p>
+  <p class="lede L-en">Notation: b batch, c channels, t temporal position, p=(i,j) spatial site, τ history index, q candidate index, n=k<sub>n</sub>².</p>
   <div class="card">
     <div class="fml" style="white-space:pre-wrap;line-height:2.5;border:none;background:none;padding:0" id="mathBox"></div>
   </div>
   <div class="grid2" style="margin-top:22px">
     <div class="card">
-      <div class="eyebrow" style="margin-bottom:12px">关键设计点</div>
-      <dl class="kv">
+      <div class="eyebrow L-zh" style="margin-bottom:12px">关键设计点</div>
+      <div class="eyebrow L-en" style="margin-bottom:12px">Key design points</div>
+      <dl class="kv L-zh">
         <dt>s 的来源</dt><dd>不是相似度 / 内积 / 距离，而是<span class="hl">学出来的前景置信</span> 1−P(背景)</dd>
         <dt>a 的归一化轴</dt><dd>候选轴 q（空间）</dd>
         <dt>w 的归一化轴</dt><dd>历史帧轴 τ（时间）</dd>
@@ -348,18 +474,37 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
         <dt>边界处理</dt><dd>历史特征 replication padding，越界候选复制最近边界</dd>
         <dt>融合方式</dt><dd>沿<span class="hlc">时间轴</span>拼接（非通道轴），再用 (2,1,1) 把 T=2 压成 1</dd>
       </dl>
+      <dl class="kv L-en">
+        <dt>Source of s</dt><dd>Not similarity / inner product / distance, but a <span class="hl">learned foreground confidence</span> 1−P(bg)</dd>
+        <dt>Axis of a</dt><dd>Candidate axis q (spatial)</dd>
+        <dt>Axis of w</dt><dd>History-frame axis τ (temporal)</dd>
+        <dt>Temperature θ</dt><dd>σ<sub>spa</sub>; applied only to a (0.9 in this model); w has no temperature</dd>
+        <dt>Boundaries</dt><dd>History features use replication padding; out-of-bound candidates copy the nearest border</dd>
+        <dt>Fusion</dt><dd>Concatenate along the <span class="hlc">time axis</span> (not channels), then (2,1,1) compresses T=2 → 1</dd>
+      </dl>
     </div>
     <div class="card">
-      <div class="eyebrow" style="margin-bottom:12px">TFoC 做对了什么</div>
-      <p style="font-size:14.5px;color:var(--muted);margin:0 0 14px">
+      <div class="eyebrow L-zh" style="margin-bottom:12px">TFoC 做对了什么</div>
+      <div class="eyebrow L-en" style="margin-bottom:12px">What TFoC got right</div>
+      <p class="L-zh" style="font-size:14.5px;color:var(--muted);margin:0 0 14px">
         把配对好的 (历史, 目标) 沿一条长度 2(t−1) 的轴<b>交错堆叠</b>，
         用 stride=2 的 <span class="hlp">(2,1,k)</span> 卷积逐对做非线性交互——
         打分之前，候选之间先互相看过一眼，而不是各自孤立地被投影。
       </p>
-      <p style="font-size:14.5px;color:var(--muted);margin:0">
+      <p class="L-en" style="font-size:14.5px;color:var(--muted);margin:0 0 14px">
+        Paired (history, target) features are <b>interleaved</b> along an axis of length 2(t−1),
+        then a stride-2 <span class="hlp">(2,1,k)</span> convolution interacts each pair nonlinearly —
+        candidates look at each other before scoring, instead of being projected in isolation.
+      </p>
+      <p class="L-zh" style="font-size:14.5px;color:var(--muted);margin:0">
         同时<b>保留候选轴</b>：搜索域 k<sub>n</sub>×k<sub>n</sub> 与融合卷积解耦，
         空间权重 a 和时间权重 w 都是 Σ=1 的凸组合，输出始终停在特征流形上；
         再沿时间轴把对齐后的历史与目标帧拼接，一次 (2,1,1) 卷积收进同一个感受野。
+      </p>
+      <p class="L-en" style="font-size:14.5px;color:var(--muted);margin:0">
+        It also <b>keeps the candidate axis</b>: search size k<sub>n</sub>×k<sub>n</sub> is decoupled from the fusion convolution;
+        spatial a and temporal w are both Σ=1 convex combinations, so the output stays on the feature manifold;
+        finally the aligned history and target are concatenated along time and folded into one (2,1,1) receptive field.
       </p>
     </div>
   </div>
@@ -367,12 +512,45 @@ footer{padding:56px 0 72px;text-align:center;color:var(--dim);font:400 12.5px/2 
 
 <footer>
   TFoC · Temporal-Spatial Focusing Convolution<br>
-  动画为原理示意，§4 数值取自 <span style="color:var(--violet)">TFoC</span> 训练检查点在预设序列上的真实前向
+  <span class="L-zh">动画为原理示意，§4 数值取自 <span style="color:var(--violet)">TFoC</span> 训练检查点在预设序列上的真实前向</span>
+  <span class="L-en">Animations are schematic; §4 numbers come from a real forward pass of the trained <span style="color:var(--violet)">TFoC</span> checkpoint on the preset sequence</span>
 </footer>
 
 <script>
 "use strict";
 const DATA = {"seq":"preset","frames":["000000","000001","000002","000003","000004","000005","000006","000007","000008"],"crop":{"r0":12,"c0":72,"h":32,"w":136,"H":64,"W":800},"dims":{"t":5,"n_hist":4,"k_n":3,"pad":1,"n":9,"c":8,"h":64,"w":800,"n_input":9},"tgt_i":4,"tgt_in":8,"attn_t":0.9,"hist_idx":[0,1,2,3],"seg_iou":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0],"track":[[25,95],[25,106],[25,116],[25,126],[25,136],[25,147],[25,157],[25,167],[25,178]],"probes":[{"key":"tgt","i":25,"j":178,"kind":"fg","attn":[[0.1123,0.112,0.11114,0.11097,0.10972,0.11103,0.11103,0.11074,0.11107],[0.10517,0.10603,0.10691,0.1076,0.11951,0.12055,0.1168,0.11214,0.10529],[0.11027,0.11175,0.11095,0.11018,0.11792,0.11551,0.11012,0.09981,0.11351],[0.11045,0.11094,0.11143,0.11139,0.11129,0.11125,0.11186,0.11052,0.11087]],"score":[[0.83327,0.83087,0.82392,0.82251,0.81234,0.82304,0.82301,0.82063,0.82332],[0.80113,0.80845,0.81588,0.82164,0.91612,0.92397,0.8955,0.85888,0.8021],[0.81983,0.83181,0.82534,0.81906,0.88017,0.86159,0.81858,0.73018,0.84589],[0.82947,0.83348,0.83743,0.8371,0.8363,0.83595,0.84092,0.83007,0.8329]],"time_score":[0.82366,0.8493,0.82583,0.83485],"time_w":[0.24756,0.25399,0.2481,0.25035]},{"key":"near","i":28,"j":183,"kind":"near","attn":[[0.11083,0.11081,0.1113,0.1119,0.11085,0.11112,0.11147,0.11181,0.10991],[0.11066,0.11091,0.11017,0.1114,0.11126,0.11045,0.11195,0.11187,0.11133],[0.10744,0.10944,0.11075,0.11172,0.1101,0.11221,0.11364,0.11346,0.11124],[0.11207,0.11073,0.11103,0.11096,0.1118,0.11175,0.1111,0.11012,0.11043]],"score":[[0.83838,0.83821,0.84216,0.84702,0.83853,0.84075,0.84358,0.84627,0.83088],[0.82945,0.83146,0.82548,0.83542,0.83435,0.82772,0.83991,0.83926,0.83492],[0.80484,0.82138,0.83208,0.83999,0.8268,0.8439,0.85533,0.85387,0.83605],[0.85165,0.84082,0.8432,0.84266,0.84942,0.84907,0.84383,0.83585,0.8384]],"time_score":[0.84064,0.83311,0.83492,0.84388],"time_w":[0.25062,0.24874,0.24919,0.25144]},{"key":"bg","i":46,"j":300,"kind":"bg","attn":[[0.1142,0.11449,0.10997,0.10878,0.10874,0.11001,0.11133,0.11086,0.11162],[0.11192,0.11208,0.11091,0.10906,0.10918,0.11208,0.11213,0.11152,0.11112],[0.11106,0.11146,0.11148,0.11125,0.11165,0.11096,0.11094,0.1109,0.1103],[0.11082,0.11152,0.11131,0.11032,0.11106,0.1109,0.11268,0.11105,0.11034]],"score":[[0.84424,0.84647,0.81028,0.80041,0.80008,0.81055,0.82132,0.81749,0.82367],[0.83498,0.83623,0.82677,0.81162,0.81266,0.83622,0.83665,0.83174,0.82845],[0.83696,0.84026,0.84039,0.83854,0.84177,0.83617,0.83603,0.83571,0.83082],[0.82743,0.83305,0.83135,0.82338,0.82938,0.82803,0.84242,0.8293,0.82348]],"time_score":[0.81939,0.82837,0.8374,0.82976],"time_w":[0.24767,0.2499,0.25217,0.25025]}],"attn_vmax":0.26713,"maps":{"rd":"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","gt":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","seg":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","feat_tgt":"AAAAAAAACAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAKBgIAAAAAAAAABQAAAAACBgAAEAcNAgYOCggCCAoHBw8NCAQFBQIDCQoHAgEAAQIFAwUEBQgHBAQEBQgLDQcGBQcNBQQHCwgIAwMECgkDAQMFBgYFCQUAAgQEBAAAAAAAAAYDAAAIAAIAAwAAAAACDgYDAAAAAAAAAAACAAAIAAAACQAAAAAAAAAAAAAEAwAAAAEAAQEBAAEAAw4FEQcAAQMDAQQGCAcLCAIEBgcFBAkKBwIAAQQGCQoHBAMCAAQGBQQCAAAAAAACDwoJAAAABAYDBQsOCQgHBwcHBwgGBwgHBQcAAAAAAAABAwAACQUAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAkAAAMBAAEAAAAAAQMCAAAAAAAAAAAAAAACAAMEAQUFBgYDBQcGBQMBAQMDAQICBAQBAAAAAwYJBwIDBgkHCwgIBw0KBgUEBAcEAwUNBgYFBgcFBAQJCAUGBAYOCwUCBwoIAAAAAAAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAQIBQAAABkAAAAMAAIAAAAAAwABAAAAAAAAAAAAAAAAAAAABgMDDQoFAwQCAgMDBAMGBwUEBAcJBwUICAoIBgYEAgAAAAIICAoGBgYJAAAAAwUFCQwNDAYIBwYFBwgGBQMEBgYGBwUHBwQEBgIDAAAAAAAAAAAAAAAAAAAAAAAAAAAFDQgCAAAAAAAAAAAFAAoAAAAAAAAAAAAAAAAACQUAAAEAAAAAAAAAAAEAAw8LCQEDBQQJCAMGBAYHAgULDQgGAwYODwcFBAUIBQUEBAICBAUEDxMGBQQCAwQEBAYEBAYHBQMDBAoHBwcGCA8OBwIECgkAAAAAAAAAAAAAAAAFAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAAAAAAAAAAABAwMEBAADBQMEBQgJCAkFAgECAwcFBQIGCAgBAgIDCQoEAwMIBAQCBgkTDgcDBQYGBgkKCwgKCgYEAgMGCAYIBgQKBQEBAwUFAQQBCgUAAAAAAAEAAAAAAAAAAAACAAcDAAAAAAQIAAAAAAAAAAAAAAAAAAAAAAABBwAGCAAEAwIAAAAAAAAAAAQFBQcHBAQGBggJBgUFCQ4LBgcI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AQMEBgoCBQIEBAQFCQEBAQgIBwYFBQUHBQQGBgkHBQIAAAACBAQGBwgIBgUGBgQDBQQEBAgMCwUFAwIAAAAEBgcJCgcJBwQEAAABAAAAAAAAAAAAAAAABRAIBQIAAAAAAAAAAAAAAAAAAAQJAggIAAAAAAAAAAAAAAAAAQAAAAAAAwQKAwAAAgsHBAYEAAABAwYFAwIEAwICAQIDAwQIDwgGBQQJBwUFBgcJBwQEBwkFBQYDAwQHCgYIBwUDCQ8JCAUCAwMAAwMABAgICwYEAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAADAAAAAQAAAAAAAAAAAAAAAIAAQAAAAAAAAAAAAAAAAAAAQAAAAABBAMBAwQDBggKBwgGBQUBAgIDAwMDBQ4HBgUEBwgEAwUFBgcFBAYJCgUECQkGCREIBAUEBgIJCQsKBAEJBQQEBQYEAwQFAgIAAAAAAAASAAAAAAAAAAoBAAAAAAAAAAcAAA4CBQAOBAAAAAEAAAAAAAAAAAgAAAAAAAAAAAADAAAAAAABAAABAgcLCAcHCAQBBgUEBggIAwIDAwMGCAoNBwUFBAUFBAMDBAcGBAMCAQAAAAICAgULBgQEBQYEBgYKCQQBBAkHBAQEBgcDBAQEBwAAAAAABQAIAAAAAAAACQIAAQAAAwAAAAAAAAAAAgAAAAMEAAAABgAAAAACAAAAAAAAAAAAAAAAAAAAAAAACwUKCQsKCAcDBAYEAwQFCwYEAgMGBgECAwEAAgMCAwYGBQUHBQIEBAUKBgUFBQUEBAQEBQUMBwYDBQYCAwQAAQECBAQEAAIBBAIEAQABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAEAAAAAAAAAAAoKEQYKDAgEAQIEAgAEAgkEAgEAAQkIBwUEAgICAgIDBAMEAwoKCQkKEA0FBQQFCAkMBgUFDAcICQYGBQEFBwcFAwQFBgcHBQc=","feat_final":"AAAAAAAAAAAAAAAAAAAAAAAAAAECAgABAQEAAAAAAAAAAAACAwMAAAAAAAECAwMBAAAAAAAAAAAAAAEAAAADAwUFCg4OCwkKCwwMCwkKDBAPDQoHBgUFBwoKCAgJCwsIBwgIBgYGBwcFBQUGBgYFBgYHBwgICQgICgwNCggHBgYHBwYGBwgICQAAAQIBAAEBAQAAAAAAAAAAAAABAgIAAQMDAgEBAQIBAAAAAAEBAAAAAAAAAgMEAQAAAAEAAAAAAAAAAAAAAgIEBAcJCQkICQoLCggHCg0QDw0LCAYEAwUHCAcHCAoJBwUHCAcGBwgIBwYHCAgIBwYFBwkMCwkHCQwQDw0MCwoJCgkIBwYFBQUBAQIDAgEBAgICAQEAAAAAAAAAAgIDAQECAwMCAQMDAwEBAAAAAAAAAAAAAAICAwEAAAAAAAAAAAAAAAAAAAEBAQIFCAkJCAgICAkIBgYICwsJCAkKCQYGBwkIBwgICQcFBwgIBgcHBwYFBwsNDQ0MCggICQgGBQcMEBIQDgsKCQoKCgkHBwcHAgEBAgIBAQECAwIBAAAAAAAAAQEAAgECAgQDAgECAwMCAQAAAQEBAQEBAAACAgIBAQEBAAAAAAAAAAEBAQEBAQEDBAUEBAUFBgcHBgQFBgcHBgcJCggGBggLDAsKCgoIBggKCgcICQgHBggKDA0ODQsKCgoIBwYHCQsMDAwMDg8PDQwLCgsLCgIBAAAAAQEBAQMCAQAAAQEAAQEBAAICAwEEBAMAAgICAQABAAEBAQECAQAAAgICAAEBAAAAAAAAAAEBAgEBAQABAwQFBgYGBQcHCAUEBAUGBwcICwsJBQUHCg0ODg8OCgYFBgcHCAgGBQMFCQ4QERANCgkJCAcGBwcICQkJCgoJCQgIBwgKDAwBAQEAAAECAQEBAQEAAAEBAAABAQEBAgMBAwMDAAEBAQAAAAAAAAABAgIBAQEBAQEBAQEAAAAAAAABAgIBAQAAAQMEBQcHBQYKDAoHBgYHBwYHCAgHBQQEBQcKDQ8PDAgEAwQEBggIBgQDAwYKDAwLDAsMCwkGBQUFBQUFBQcKDAsJCAcICQkIAQMBAAECAwEBAAAAAAAAAAAAAAAAAAEBAQMDAwABAQEAAAAAAAAAAwUGBAIBAAAAAAEBAAAAAAAAAQEBAAAAAQMEBgcJCQcHCgsLCAYGCQsLCgkKCAYEAwMDBQcKDAkGAwQGBggKCwkHBgcICwwMCwwOEBEOCAQEBgcHBgUFBgYHBwcGBQQEBAECAAACAwIBAQEBAAAAAAAAAAAAAAAAAQECAgEAAQEBAAAAAAAAAAYICgUEAQAAAAABAQAAAAAAAQEBAQEBAQIEBggNDgwHBwkMCwkHBwsODgoIBgYFBQUFBAMFBwkGBQQGCAgKDQ8QDQsICAkICAkLDA4QDgoGBggKCgkHBQUFBgcHBwYFBQUBAgAAAQICAQAAAQAAAAEBAAAAAQEBAQEAAgIAAAAAAQEBAAAAAQAFBgcDAwIBAQAAAQEAAAAAAAABAQEBAQECBAYJDQ0KBwYHCAoKCQgLDg0JBwcHBgUEBgYGCAgICAsLCgoJDBEUFhQRDAkJCAgICQoNDg0LCQgICQgHBQUGBgcICAgICAgIAAAAAAAAAAABAQEBAAABAQAAAQICAQEBAQEBAAAAAAIEBAIBAQEAAQICAQEBAgMBAAECAQAAAAEAAQEBAQEBAwcICg0OCgcICgsLCwkJCQgHBQUEBQcGBQYGBwkIBggODw0JCQsQEhMSDggGBQUFBgYFBggKCwoJCAoIBwQEBAYGBwcICAkMDAAAAAEBAAAAAAAAAAAAAAAAAAECAgEAAQAAAQAAAAADBQUBAQEBAQAAAAABAwMEAgECAwIBAAICAQABAQEAAAIGCAkKCwgHCQsNDQwJBwcGBAUGBwgJCAcHBwgJCAYIDg8MCAcJCwsKCQcFAwQFBQcHBgYHCQkJCQkLCQgFBgcICAkJCgoKCgsAAAABAQAAAAAAAAAAAAAAAAABAQECAQEBAgIBAQABAwQEAgEBAAEAAAACAgICAwIBAgQFBgQEBgcHBgQEBAUEBQYHDBESDQsMDxAOCgwOCwgHCg4NDAwMDAwNEA8MCAgIBwcJCwsIBQYICQgIBgcICQgJCQkGBQYJDAwLBwYHBgcJCwsLCwoJAQAAAQICAQEAAAAAAAAAAAAAAAECBAMDAwMFBAMDBQkIBQQDAwAAAQICBAMCAwMEAgMGCgwICAgJCQcFBgoQDgsBBxMgIhgREBcYFQ4SGRYRDRIaFxINDxETFhcWEw4KCAkMERMSDAsNEBANCwwODQsKCgkIBgUGCAsLCQcHCAcICAkJCgsKCAIBAAECAgICAQAAAQEAAAAAAAACAwUEBQYGBgQDAwYJ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BQcLDAsHBgYGBgYGBgcICAoLDQ0MCgYEBAQGBwgICQcGBQUFBQcKCwsLCgwNDQ0NDg0NDAsJCAgGBwkLCAUDBAYICggHBwsNAwICAQAAAQEBAAAAAQEBAwMDAQABAgMCAQAAAAABAQEBAAIBAgABAAIDAwICAwIAAAAAAAIBAQAAAgMDAwQDAQMFCAoKCgoKCwkICAcHBwcHCQsMDAkGAwQFBgYGBgcHBwcHBQMFCg4PDQoJCgsMDA0MDAsKCQcHBgYGBgUEBAQGBwgIBwYJCwEAAAAAAQEBAQAAAAAAAAEBAgEBAAABAQEBAQAAAAABAAABAQIBAQECAwMCBAUFAQEAAAABAAAAAAIDAwIBAQECAwUICgoLCgsKCQgHBwUFBAQGCAgGBgYHBwgHCAgJBwYGBgQCAgUKDg8NCwkHBgcJCQoLDAoHBgUFBgYFBQUICwkGBAQEBgcAAAAAAQECAQEAAAAAAAAAAQECAQAAAQECAQEBAAAAAAAAAQEBAQEBAQEBAAQEBQEBAAAAAAAAAAAAAAEAAQEBAgMFCAsLCwkKCgkIBwYEBQUFBQYFBAUJDAwKBwYGCAgICAkGBAQFBwkMDQ4LCAUFBgcJCgsKBwYGBgYGBgUFCAoIBgQEBAQFAAAAAQIBAQEBAAAAAAAAAAECBAIBAAABAQECAwIBAAAAAAAAAAEBAAABAQEDBAQBAQAAAAAAAAAAAAABAAAAAAEDBQgKCwoHBwYFBgYGBgYFBAUHBwcIDQ8OCwgICQsJCQkJBwUEBQUGCQ0QEQ0JBwcGBwkLDAoIBwcIBwYFBwkKCQcHBwcFBQAAAAECAQAAAAAAAAAAAAAAAQQDAgAAAQECAwMCAgEBAQEAAAAAAAECAAAAAgMDAQAAAAABAgICAgMDAwIAAAACBAgKDAwJBgYHBwYGCAkIBgcIBwYGCA0PDQoJCwoKBwgJCwkHBgYEBAYKCwsJCAgJBwYICwwJCAgKCwkHBgcICAkJCgoIBwg="},"score_range":[0.1422,0.9585]};
+
+/* ═══════════ i18n ═══════════ */
+let LANG = (localStorage.getItem('tfoc_lang') === 'en') ? 'en' : 'zh';
+const LANG_HOOKS = [];
+function tr(zh, en){ return LANG === 'en' ? (en == null ? zh : en) : zh; }
+function onLang(fn){ LANG_HOOKS.push(fn); }
+function setLang(lang){
+  LANG = (lang === 'en') ? 'en' : 'zh';
+  localStorage.setItem('tfoc_lang', LANG);
+  document.documentElement.lang = LANG === 'en' ? 'en' : 'zh-CN';
+  document.documentElement.classList.toggle('lang-zh', LANG === 'zh');
+  document.documentElement.classList.toggle('lang-en', LANG === 'en');
+  document.title = tr('TFoC · 时空聚焦卷积 — 给卷积装一台云台',
+                     'TFoC · Temporal-Spatial Focusing Convolution — A gimbal for convolution');
+  const btn = document.getElementById('langToggle');
+  if(btn){
+    btn.querySelectorAll('.opt').forEach(o=>o.classList.toggle('on', o.dataset.lang === LANG));
+  }
+  LANG_HOOKS.forEach(fn=>{ try{ fn(LANG); }catch(e){} });
+}
+document.documentElement.classList.add(LANG === 'en' ? 'lang-en' : 'lang-zh');
+document.documentElement.lang = LANG === 'en' ? 'en' : 'zh-CN';
+document.addEventListener('DOMContentLoaded', ()=>{
+  const btn = document.getElementById('langToggle');
+  if(btn){
+    btn.addEventListener('click', e=>{
+      const opt = e.target.closest('.opt');
+      setLang(opt ? opt.dataset.lang : (LANG === 'zh' ? 'en' : 'zh'));
+    });
+  }
+  setLang(LANG);
+});
 
 /* ═══════════ 基础工具 ═══════════ */
 const INFERNO=[[0,0,4],[27,12,65],[74,12,107],[120,28,109],[165,44,96],[207,68,70],[237,105,37],[251,155,6],[252,255,164]];
@@ -447,7 +625,9 @@ function frame(ts){
     g.setTransform(1,0,0,1,0,0);
     g.clearRect(0,0,st.cv.width,st.cv.height);
     g.setTransform(s,0,0,s,(st.cv.width-st.W*s)/2,(st.cv.height-st.H*s)/2);
-    st.draw(g, ts/1000, st.W, st.H);
+    // 单个画布出错不应冻结整页动画循环
+    try{ st.draw(g, ts/1000, st.W, st.H); }
+    catch(e){ if(!st.warned){ st.warned=true; console.warn('canvas draw failed:', st.cv.id, e); } }
   }
   requestAnimationFrame(frame);
 }
@@ -579,9 +759,9 @@ function frame(ts){
     const fr=clamp(dev/230,0,1);
     g.fillStyle=col; g.shadowColor=col; g.shadowBlur=12;
     roundRect(g,bx0,by0,Math.max(6,bw*fr),9,5); g.fill(); g.shadowBlur=0;
-    glowText(g,mode==='rigid'?'刚性支架':'三轴云台',bx0,cy-fh/2-16,col,'600 17px "Segoe UI","Microsoft YaHei",sans-serif',10);
+    glowText(g,mode==='rigid'?tr('刚性支架','Rigid mount'):tr('三轴云台','3-axis gimbal'),bx0,cy-fh/2-16,col,'600 17px "Segoe UI","Microsoft YaHei",sans-serif',10);
     g.fillStyle='#6c6c96'; g.font='500 12px ui-monospace,monospace';
-    g.fillText('主体偏离画面中心  '+dev.toFixed(0)+' px', bx0, by0+26);
+    g.fillText(tr('主体偏离画面中心  ','Subject offset from centre  ')+dev.toFixed(0)+' px', bx0, by0+26);
   }
   stage('cvShake',W,H,(g,t)=>panel(g,t,'rigid'));
   stage('cvGimbal',W,H,(g,t)=>panel(g,t,'gimbal'));
@@ -644,9 +824,10 @@ function frame(ts){
   stage('cvRigid',W,H,(g,t)=>{
     const R=scene(t), cell=34, gw=cell*K, wcell=24, x0=76, gap=196, y0=88;
     g.fillStyle='#9e9ec8'; g.font='600 12.5px ui-monospace,monospace';
-    g.fillText('四个历史帧上的同一个 3×3 搜索域',x0,42);
+    g.fillText(tr('四个历史帧上的同一个 3×3 搜索域','The same 3×3 search window on four history frames'),x0,42);
     g.fillStyle='#6c6c96'; g.font='500 11px ui-monospace,monospace';
-    g.fillText('亮 = 目标能量 · 颗粒 = 杂波 · 紫圈 = 目标真实位置',x0,62);
+    g.fillText(tr('亮 = 目标能量 · 颗粒 = 杂波 · 紫圈 = 目标真实位置',
+                 'Bright = target · grains = clutter · violet ring = true target'),x0,62);
     for(let h=0;h<NH;h++){
       const f=R.F[h], gx=x0+h*gap;
       g.fillStyle='#6c6c96'; g.font='600 11.5px ui-monospace,monospace';
@@ -666,10 +847,10 @@ function frame(ts){
       g.shadowBlur=0;
       // 两组空间权重
       g.fillStyle='#ff6b6b'; g.font='600 10.5px ui-monospace,monospace';
-      g.fillText('固定核 W  (与输入无关)',gx,y0+gw+26);
+      g.fillText(tr('固定核 W  (与输入无关)','Fixed kernel W  (input-independent)'),gx,y0+gw+26);
       grid(g,gx,y0+gw+34,wcell,FIXED,'#ff6b6b',.28);
       g.fillStyle='#ffc300'; g.font='600 10.5px ui-monospace,monospace';
-      g.fillText('自适应 a  (Σ=1)',gx,y0+gw+128);
+      g.fillText(tr('自适应 a  (Σ=1)','Adaptive a  (Σ=1)'),gx,y0+gw+128);
       grid(g,gx,y0+gw+136,wcell,f.a,'#ffc300',.28);
       // 时间权重
       const wy=y0+gw+232;
@@ -682,12 +863,13 @@ function frame(ts){
       g.fillRect(gx,wy+20,gw*(.25/.45),5);
     }
     g.fillStyle='#6c6c96'; g.font='500 10.5px ui-monospace,monospace';
-    g.fillText('时间权重 w<τ> — 琥珀 = TFoC 自适应，红 = 固定核对每帧一视同仁 (1/4)',x0,y0+gw+282);
+    g.fillText(tr('时间权重 w<τ> — 琥珀 = TFoC 自适应，红 = 固定核对每帧一视同仁 (1/4)',
+                 'Temporal w<τ> — amber = TFoC adaptive, red = fixed kernel treats every frame equally (1/4)'),x0,y0+gw+282);
 
     // 右侧纯度仪表
     const px=W-268, py=112, bw=220;
     g.fillStyle='#9e9ec8'; g.font='600 13px ui-monospace,monospace';
-    g.fillText('感受野内目标能量占比',px,py-34);
+    g.fillText(tr('感受野内目标能量占比','Target energy share in the RF'),px,py-34);
     const bar=(y,v,col,lab)=>{
       g.fillStyle=col; g.font='700 15px ui-monospace,monospace';
       g.fillText((v*100).toFixed(1)+'%',px,y-9);
@@ -696,70 +878,93 @@ function frame(ts){
       g.fillStyle=col; g.shadowColor=col; g.shadowBlur=14;
       roundRect(g,px,y,Math.max(10,bw*v),18,9); g.fill(); g.shadowBlur=0;
     };
-    bar(py,R.conv,'#ff6b6b','Conv3d 固定核 + 均匀时间');
-    bar(py+80,R.tfoc,'#ffc300','TFoC 自适应 + w<τ>');
+    bar(py,R.conv,'#ff6b6b',tr('Conv3d 固定核 + 均匀时间','Conv3d fixed + uniform time'));
+    bar(py+80,R.tfoc,'#ffc300',tr('TFoC 自适应 + w<τ>','TFoC adaptive + w<τ>'));
     const gain=(R.tfoc-R.conv)*100;
     g.fillStyle=gain>=0?'#06ffa5':'#ff6b6b'; g.font='700 34px ui-monospace,monospace';
     g.fillText((gain>=0?'+':'')+gain.toFixed(1)+' pt',px,py+186);
     g.fillStyle='#6c6c96'; g.font='500 11px ui-monospace,monospace';
-    g.fillText('自适应带来的净增益',px,py+208);
+    g.fillText(tr('自适应带来的净增益','Net gain from adaptation'),px,py+208);
     g.fillStyle='#9e9ec8'; g.font='500 11px ui-monospace,monospace';
-    g.fillText('两者从完全相同的窗口取值，',px,py+250);
-    g.fillText('区别只在权重怎么定。',px,py+268);
+    g.fillText(tr('两者从完全相同的窗口取值，','Both read the exact same window;'),px,py+250);
+    g.fillText(tr('区别只在权重怎么定。','the only difference is how weights are set.'),px,py+268);
   });
 })();
 
 /* ═══════════ §3 五步流水线 ═══════════ */
 const STEPS=[
-  {no:'01',nm:'取候选',sub:'gather',
-   fml:'p<span class="op">ʰˢᵗ</span><sub>q</sub>(i,j) = (i+Δr<sub>q</sub>, j+Δc<sub>q</sub>),&nbsp; q = 0 … n−1<br><span class="cm">// 每个历史帧在同一位置取 k<sub>n</sub>×k<sub>n</sub> 个候选，边界 replication padding</span>',
+  {no:'01',nm:['取候选','Gather'],sub:'gather',
+   fml:['p<span class="op">ʰˢᵗ</span><sub>q</sub>(i,j) = (i+Δr<sub>q</sub>, j+Δc<sub>q</sub>),&nbsp; q = 0 … n−1<br><span class="cm">// 每个历史帧在同一位置取 k<sub>n</sub>×k<sub>n</sub> 个候选，边界 replication padding</span>',
+        'p<span class="op">ʰˢᵗ</span><sub>q</sub>(i,j) = (i+Δr<sub>q</sub>, j+Δc<sub>q</sub>),&nbsp; q = 0 … n−1<br><span class="cm">// gather k<sub>n</sub>×k<sub>n</sub> candidates at the same site on every history frame; replication padding at borders</span>'],
    shape:'x_hst_cand : (b, c, t−1, h·w, n) = (1, 8, 4, 51200, 9)',
-   gim:'云台先<b>看清视野</b>。镜头不动，但它把主体可能出现的一小片区域整个纳入观察——这就是 k<sub>n</sub>×k<sub>n</sub> 搜索域。搜索域是超参数，与后面的融合卷积完全解耦。'},
-  {no:'02',nm:'配对度量',sub:'pair interact',
-   fml:'P = interleave(x<sup>hist</sup>, x<sup>tgt</sup>) &nbsp;→&nbsp; Conv3d<sub>(2,1,k)</sub><span class="op">, stride=(2,1,1)</span><br>s<sub>τ,p,q</sub> = 1 − softmax<sub>class</sub>(logits)<sub>[背景]</sub><br><span class="cm">// s 是学出来的前景置信，不是相似度 / 内积 / 距离</span>',
+   gim:['云台先<b>看清视野</b>。镜头不动，但它把主体可能出现的一小片区域整个纳入观察——这就是 k<sub>n</sub>×k<sub>n</sub> 搜索域。搜索域是超参数，与后面的融合卷积完全解耦。',
+        'The gimbal first <b>scopes its field of view</b>. The lens stays put, but it takes in the small region where the subject may appear — that is the k<sub>n</sub>×k<sub>n</sub> search window. Search size is a hyperparameter, fully decoupled from the later fusion convolution.']},
+  {no:'02',nm:['配对度量','Pair interact'],sub:'pair interact',
+   fml:['P = interleave(x<sup>hist</sup>, x<sup>tgt</sup>) &nbsp;→&nbsp; Conv3d<sub>(2,1,k)</sub><span class="op">, stride=(2,1,1)</span><br>s<sub>τ,p,q</sub> = 1 − softmax<sub>class</sub>(logits)<sub>[背景]</sub><br><span class="cm">// s 是学出来的前景置信，不是相似度 / 内积 / 距离</span>',
+        'P = interleave(x<sup>hist</sup>, x<sup>tgt</sup>) &nbsp;→&nbsp; Conv3d<sub>(2,1,k)</sub><span class="op">, stride=(2,1,1)</span><br>s<sub>τ,p,q</sub> = 1 − softmax<sub>class</sub>(logits)<sub>[bg]</sub><br><span class="cm">// s is a learned foreground confidence, not similarity / inner product / distance</span>'],
    shape:'pair : (b, c, 2(t−1), h·w, n) → logits : (b, 5, t−1, h·w, n)',
-   gim:'云台的<b>陀螺仪</b>。把每个候选和目标帧特征配成一对，交给一个小卷积去判断「这一对里，历史候选是不是同一个主体」。TFoC 的关键是它<b>保留候选轴</b>，让候选之间先互相看一眼再打分。'},
-  {no:'03',nm:'空间聚焦',sub:'pan / tilt',
-   fml:'a<sub>τ,p,q</sub> = softmax<sub>q</sub>( s<sub>τ,p,q</sub> / θ ),&nbsp; <span class="op">Σ</span><sub>q</sub> a = 1<br>x̂<sup>hist</sup><sub>τ,p</sub> = <span class="op">Σ</span><sub>q</sub> a<sub>τ,p,q</sub> · x<sup>hist</sup><sub>τ,p,q</sub>',
+   gim:['云台的<b>陀螺仪</b>。把每个候选和目标帧特征配成一对，交给一个小卷积去判断「这一对里，历史候选是不是同一个主体」。TFoC 的关键是它<b>保留候选轴</b>，让候选之间先互相看一眼再打分。',
+        'The gimbal’s <b>gyroscope</b>. Pair every history candidate with the target feature and let a small convolution decide whether they are the same subject. TFoC’s key move is to <b>keep the candidate axis</b> so candidates look at each other before scoring.']},
+  {no:'03',nm:['空间聚焦','Pan / tilt'],sub:'pan / tilt',
+   fml:['a<sub>τ,p,q</sub> = softmax<sub>q</sub>( s<sub>τ,p,q</sub> / θ ),&nbsp; <span class="op">Σ</span><sub>q</sub> a = 1<br>x̂<sup>hist</sup><sub>τ,p</sub> = <span class="op">Σ</span><sub>q</sub> a<sub>τ,p,q</sub> · x<sup>hist</sup><sub>τ,p,q</sub>',
+        'a<sub>τ,p,q</sub> = softmax<sub>q</sub>( s<sub>τ,p,q</sub> / θ ),&nbsp; <span class="op">Σ</span><sub>q</sub> a = 1<br>x̂<sup>hist</sup><sub>τ,p</sub> = <span class="op">Σ</span><sub>q</sub> a<sub>τ,p,q</sub> · x<sup>hist</sup><sub>τ,p,q</sub>'],
    shape:'attn : (b, t−1, h·w, n) → x_hist_agg : (b, c, t−1, h·w)',
-   gim:'云台的<b>偏航与俯仰</b>。按前景置信重新分配 9 个候选的权重，重心自动挪向目标真正所在的那一格。因为 Σa=1，输出始终是候选的凸组合——搜索域再大也不会把能量稀释掉。'},
-  {no:'04',nm:'时间聚焦',sub:'temporal follow',
-   fml:'u<sub>τ,p</sub> = mean<sub>q</sub>( s<sub>τ,p,q</sub> )<br>w<sub>τ,p</sub> = softmax<sub>τ</sub>( u<sub>τ,p</sub> ),&nbsp; <span class="op">Σ</span><sub>τ</sub> w = 1<br>x<sup>hist</sup><sub>final,p</sub> = <span class="op">Σ</span><sub>τ</sub> w<sub>τ,p</sub> · x̂<sup>hist</sup><sub>τ,p</sub>',
+   gim:['云台的<b>偏航与俯仰</b>。按前景置信重新分配 9 个候选的权重，重心自动挪向目标真正所在的那一格。因为 Σa=1，输出始终是候选的凸组合——搜索域再大也不会把能量稀释掉。',
+        'The gimbal’s <b>yaw and pitch</b>. Reweight the nine candidates by foreground confidence so the mass shifts to the cell that actually holds the target. Because Σa=1, the output is always a convex combination — a larger search window never dilutes energy.']},
+  {no:'04',nm:['时间聚焦','Temporal follow'],sub:'temporal follow',
+   fml:['u<sub>τ,p</sub> = mean<sub>q</sub>( s<sub>τ,p,q</sub> )<br>w<sub>τ,p</sub> = softmax<sub>τ</sub>( u<sub>τ,p</sub> ),&nbsp; <span class="op">Σ</span><sub>τ</sub> w = 1<br>x<sup>hist</sup><sub>final,p</sub> = <span class="op">Σ</span><sub>τ</sub> w<sub>τ,p</sub> · x̂<sup>hist</sup><sub>τ,p</sub>',
+        'u<sub>τ,p</sub> = mean<sub>q</sub>( s<sub>τ,p,q</sub> )<br>w<sub>τ,p</sub> = softmax<sub>τ</sub>( u<sub>τ,p</sub> ),&nbsp; <span class="op">Σ</span><sub>τ</sub> w = 1<br>x<sup>hist</sup><sub>final,p</sub> = <span class="op">Σ</span><sub>τ</sub> w<sub>τ,p</sub> · x̂<sup>hist</sup><sub>τ,p</sub>'],
    shape:'time_w : (b, t−1, h·w) → x_hist_agg_final : (b, c, 1, h, w)',
-   gim:'云台的<b>跟随强度</b>。哪一帧看得清楚，哪一帧就说话更响。被浪花或杂波糊住的历史帧会自动降权——这是固定卷积核做不到的，它对每个历史帧一视同仁。'},
-  {no:'05',nm:'融合',sub:'one convolution',
-   fml:'x<sup>fuse</sup> = concat<sub>时间轴</sub>( x<sup>hist</sup><sub>final</sub>, x<sup>tgt</sup> )<br>x<sup>out</sup> = Conv3d<sub>(2,1,1)</sub>( x<sup>fuse</sup> )&nbsp;&nbsp;<span class="cm">// T: 2 → 1</span>',
+   gim:['云台的<b>跟随强度</b>。哪一帧看得清楚，哪一帧就说话更响。被浪花或杂波糊住的历史帧会自动降权——这是固定卷积核做不到的，它对每个历史帧一视同仁。',
+        'The gimbal’s <b>follow gain</b>. Clearer frames speak louder. History frames blurred by spray or clutter are down-weighted automatically — something a fixed kernel cannot do, because it treats every history frame the same.']},
+  {no:'05',nm:['融合','One convolution'],sub:'one convolution',
+   fml:['x<sup>fuse</sup> = concat<sub>时间轴</sub>( x<sup>hist</sup><sub>final</sub>, x<sup>tgt</sup> )<br>x<sup>out</sup> = Conv3d<sub>(2,1,1)</sub>( x<sup>fuse</sup> )&nbsp;&nbsp;<span class="cm">// T: 2 → 1</span>',
+        'x<sup>fuse</sup> = concat<sub>time</sub>( x<sup>hist</sup><sub>final</sub>, x<sup>tgt</sup> )<br>x<sup>out</sup> = Conv3d<sub>(2,1,1)</sub>( x<sup>fuse</sup> )&nbsp;&nbsp;<span class="cm">// T: 2 → 1</span>'],
    shape:'x_fuse : (b, 8, 2, h, w) → x_out : (b, 128, 1, h, w)',
-   gim:'<b>快门按下</b>。此刻这一次卷积的感受野里，装的不再是四个错位的历史片段，而是被稳稳对齐到同一个目标上的时空一致信息。'}
+   gim:['<b>快门按下</b>。此刻这一次卷积的感受野里，装的不再是四个错位的历史片段，而是被稳稳对齐到同一个目标上的时空一致信息。',
+        '<b>Shutter click</b>. The receptive field of this one convolution no longer holds four misaligned history patches — it holds spatiotemporally consistent information locked onto the same target.']}
 ];
+function stepNm(s){ return Array.isArray(s.nm) ? tr(s.nm[0], s.nm[1]) : s.nm; }
+function stepFml(s){ return Array.isArray(s.fml) ? tr(s.fml[0], s.fml[1]) : s.fml; }
+function stepGim(s){ return Array.isArray(s.gim) ? tr(s.gim[0], s.gim[1]) : s.gim; }
 (function(){
   const W=1280,H=576;
   let cur=0, playing=true, tPhase=0, last=0;
   const bar=document.getElementById('stepBar');
   STEPS.forEach((s,i)=>{
     const d=document.createElement('div'); d.className='step'+(i===0?' on':'');
-    d.innerHTML=`<div class="no">STEP ${s.no}</div><div class="nm">${s.nm}</div>
+    d.innerHTML=`<div class="no">STEP ${s.no}</div><div class="nm">${stepNm(s)}</div>
                  <div class="sub">${s.sub}</div><div class="bar"></div>`;
     d.onclick=()=>{cur=i;tPhase=0;sync();};
     bar.appendChild(d);
   });
   const nodes=[...bar.children];
   function sync(){
-    nodes.forEach((n,i)=>n.classList.toggle('on',i===cur));
+    nodes.forEach((n,i)=>{
+      n.classList.toggle('on',i===cur);
+      n.querySelector('.nm').textContent=stepNm(STEPS[i]);
+    });
     const s=STEPS[cur];
-    document.getElementById('fmlTitle').textContent=`STEP ${s.no} · ${s.nm}`;
-    document.getElementById('fmlBox').innerHTML=s.fml;
+    document.getElementById('fmlTitle').textContent=`STEP ${s.no} · ${stepNm(s)}`;
+    document.getElementById('fmlBox').innerHTML=stepFml(s);
     document.getElementById('shapeBox').textContent=s.shape;
-    document.getElementById('gimBox').innerHTML=s.gim;
-    document.getElementById('stepHint').textContent=`${cur+1} / ${STEPS.length} · 点击卡片可直接跳转`;
+    document.getElementById('gimBox').innerHTML=stepGim(s);
+    document.getElementById('stepHint').textContent=
+      tr(`${cur+1} / ${STEPS.length} · 点击卡片可直接跳转`,
+        `${cur+1} / ${STEPS.length} · click a card to jump`);
+    const pb=document.getElementById('playBtn');
+    pb.textContent=playing?tr('⏸ 暂停','⏸ Pause'):tr('▶ 播放','▶ Play');
+    document.getElementById('prevBtn').textContent=tr('◀ 上一步','◀ Prev');
+    document.getElementById('nextBtn').textContent=tr('下一步 ▶','Next ▶');
   }
   document.getElementById('playBtn').onclick=e=>{
-    playing=!playing; e.target.textContent=playing?'⏸ 暂停':'▶ 播放';
+    playing=!playing; e.target.textContent=playing?tr('⏸ 暂停','⏸ Pause'):tr('▶ 播放','▶ Play');
     e.target.classList.toggle('on',playing);
   };
   document.getElementById('prevBtn').onclick=()=>{cur=(cur+STEPS.length-1)%STEPS.length;tPhase=0;sync();};
   document.getElementById('nextBtn').onclick=()=>{cur=(cur+1)%STEPS.length;tPhase=0;sync();};
   sync();
+  onLang(sync);
 
   // 演示用的一组候选分数（视觉上有结构，逐帧缓慢流动）
   function demoScores(t){
@@ -827,26 +1032,26 @@ const STEPS=[
     const cellM=48, gwM=cellM*3;
 
     // ══ 目标帧卡片（贯穿全程）
-    card(g,TX,TY,TW,CH_,'目标帧  x^tgt','#ff6b6b',true);
+    card(g,TX,TY,TW,CH_,tr('目标帧  x^tgt','Target  x^tgt'),'#ff6b6b',true);
     cellGrid(g,TX+40,TY+64,cellM,TGT_PATCH,v=>infernoCss(v));
     g.strokeStyle=TGT_COL; g.lineWidth=1.6;
     g.strokeRect(TX+40+cellM-1.5,TY+64+cellM-1.5,cellM,cellM);
     g.fillStyle=TGT_COL; g.font='600 11px ui-monospace,monospace';
-    g.fillText('位置 p 的特征',TX+40,TY+56);
+    g.fillText(tr('位置 p 的特征','Feature at site p'),TX+40,TY+56);
     g.fillStyle='#6c6c96'; g.font='500 10.5px ui-monospace,monospace';
-    g.fillText('c = 8 通道',TX+40,TY+64+gwM+22);
-    g.fillText('t = 5 中的最后一个',TX+40,TY+64+gwM+40);
-    g.fillText('时间位置',TX+40,TY+64+gwM+58);
+    g.fillText(tr('c = 8 通道','c = 8 channels'),TX+40,TY+64+gwM+22);
+    g.fillText(tr('t = 5 中的最后一个','last of t = 5 temporal'),TX+40,TY+64+gwM+40);
+    g.fillText(tr('时间位置','positions'),TX+40,TY+64+gwM+58);
     g.fillStyle='#ff6b6b'; g.font='600 10.5px ui-monospace,monospace';
-    g.fillText('只有中心 p 参与配对',TX+40,TY+64+gwM+86);
-    g.fillText('（不做空间采样）',TX+40,TY+64+gwM+104);
+    g.fillText(tr('只有中心 p 参与配对','Only centre p is paired'),TX+40,TY+64+gwM+86);
+    g.fillText(tr('（不做空间采样）','(no spatial sampling)'),TX+40,TY+64+gwM+104);
 
     // ══ 四个历史列
     for(let h=0;h<4;h++){
       const x=CX[h], col=FR_COL[h];
       const on = cur===0 ? P*5>h : true;
       const app = cur===0 ? clamp(P*5-h,0,1) : 1;
-      card(g,x,TY,CW,CH_,'历史特征  τ = '+h,col,on);
+      card(g,x,TY,CW,CH_,tr('历史特征  τ = ','History  τ = ')+h,col,on);
       const gx=x+(CW-gwM)/2, gy=TY+58;
       g.globalAlpha=app;
 
@@ -856,10 +1061,10 @@ const STEPS=[
         g.strokeStyle=col; g.lineWidth=1.8; g.setLineDash([4,3]);
         g.strokeRect(gx-4,gy-4,gwM+2,gwM+2); g.setLineDash([]);
         g.fillStyle=col; g.font='600 11px ui-monospace,monospace';
-        g.fillText('k_n × k_n = 9 个候选',gx-4,gy+gwM+26);
+        g.fillText(tr('k_n × k_n = 9 个候选','k_n × k_n = 9 candidates'),gx-4,gy+gwM+26);
         g.fillStyle='#6c6c96'; g.font='500 10.5px ui-monospace,monospace';
-        g.fillText('中心与目标位置 p 对齐',gx-4,gy+gwM+46);
-        g.fillText('越界处 replication padding',gx-4,gy+gwM+64);
+        g.fillText(tr('中心与目标位置 p 对齐','Centre aligned with target p'),gx-4,gy+gwM+46);
+        g.fillText(tr('越界处 replication padding','Replication padding at borders'),gx-4,gy+gwM+64);
       }
       else if(cur===1){
         cellGrid(g,gx,gy,cellM,S[h],v=>`rgba(157,78,221,${.14+.4*v})`);
@@ -868,7 +1073,8 @@ const STEPS=[
         g.strokeStyle='#ffc300'; g.lineWidth=2.2; g.shadowColor='#ffc300'; g.shadowBlur=12;
         g.strokeRect(gx+(q%3)*cellM-2,gy+((q/3)|0)*cellM-2,cellM,cellM); g.shadowBlur=0;
         // 5 类概率
-        const base=[.58,.24,.08,.06,.04], cn=['背景','UAV','行人','汽车','船'];
+        const base=[.58,.24,.08,.06,.04];
+        const cn=LANG==='en'?['bg','UAV','ped.','car','boat']:['背景','UAV','行人','汽车','船'];
         const sc=S[h][q];
         const cls=[clamp(1-sc*.85,.05,.95)]; const rest=1-cls[0];
         for(let i=1;i<5;i++) cls.push(rest*base[i]/(base[1]+base[2]+base[3]+base[4]));
@@ -881,7 +1087,7 @@ const STEPS=[
           g.fillText(cn[i],gx-4,by+10);
         }
         g.fillStyle='#ffc300'; g.font='700 12px ui-monospace,monospace';
-        g.fillText('s = 1 − P(背景) = '+(1-cls[0]).toFixed(2),gx-4,gy+gwM+130);
+        g.fillText('s = 1 − P('+tr('背景','bg')+') = '+(1-cls[0]).toFixed(2),gx-4,gy+gwM+130);
       }
       else if(cur===2){
         const hi=A[h].indexOf(Math.max.apply(null,A[h]));
@@ -897,7 +1103,7 @@ const STEPS=[
         g.fillStyle='#ffc300'; g.font='600 11px ui-monospace,monospace';
         g.fillText('Σ a = 1.000',gx-4,gy+gwM+26);
         g.fillStyle='#6c6c96'; g.font='500 10.5px ui-monospace,monospace';
-        g.fillText('准星 = 权重重心',gx-4,gy+gwM+46);
+        g.fillText(tr('准星 = 权重重心','crosshair = weight centroid'),gx-4,gy+gwM+46);
       }
       else{
         // 已对齐：把 9 个候选压成一个向量
@@ -931,7 +1137,8 @@ const STEPS=[
       g.fillStyle='#4cc9f0'; g.font='700 15px ui-monospace,monospace';
       g.fillText('x_hst_cand  :  (b, c, t−1, h·w, n)  =  (1, 8, 4, 51200, 9)',TX+22,BY+30);
       g.fillStyle='#6c6c96'; g.font='500 11.5px ui-monospace,monospace';
-      g.fillText('每个空间位置、每个历史帧，都各自握有 9 个候选特征向量',TX+22,BY+50);
+      g.fillText(tr('每个空间位置、每个历史帧，都各自握有 9 个候选特征向量',
+                   'Every spatial site × history frame holds its own 9 candidate feature vectors'),TX+22,BY+50);
     }
     else if(cur===1){
       bandLabel(g,'交错堆叠后由 stride=2 的 (2,1,k) 卷积逐对处理','#ffc300',TX);
@@ -952,7 +1159,8 @@ const STEPS=[
       g.fillStyle='#ffc300'; g.font='600 11px ui-monospace,monospace';
       g.fillText('kernel (2,1,k)  stride 2',kx-6,BY+72);
       g.fillStyle='#6c6c96'; g.font='500 11px ui-monospace,monospace';
-      g.fillText('候选轴 n 被保留 —— 打分之前候选之间先互相看一眼（TFoC 的改动）',bx0+330,BY+72);
+      g.fillText(tr('候选轴 n 被保留 —— 打分之前候选之间先互相看一眼（TFoC 的改动）',
+                   'Candidate axis n is kept — candidates look at each other before scoring (TFoC’s change)'),bx0+330,BY+72);
     }
     else if(cur===2){
       bandLabel(g,'每个历史帧得到一个已对齐的特征','#ffc300');
@@ -964,8 +1172,8 @@ const STEPS=[
         g.fillText('x̂^hist  τ = '+h,x+16,BY+28);
       }
       g.fillStyle='#6c6c96'; g.font='500 11.5px ui-monospace,monospace';
-      g.fillText('凸组合 → 输出始终',TX,BY+18);
-      g.fillText('停在特征流形上',TX,BY+36);
+      g.fillText(tr('凸组合 → 输出始终','Convex combo → output stays'),TX,BY+18);
+      g.fillText(tr('停在特征流形上','on the feature manifold'),TX,BY+36);
     }
     else if(cur===3){
       bandLabel(g,'时间权重 w<τ>   Σ = 1','#ffc300');
@@ -978,9 +1186,10 @@ const STEPS=[
         g.fillText(Wt[h].toFixed(3),x+16,BY+29);
       }
       g.fillStyle='#6c6c96'; g.font='500 11px ui-monospace,monospace';
-      g.fillText('看得清的帧',TX,BY+18); g.fillText('说话更响',TX,BY+36);
+      g.fillText(tr('看得清的帧','Clearer frames'),TX,BY+18); g.fillText(tr('说话更响','speak louder'),TX,BY+36);
       g.fillStyle='#06ffa5'; g.font='600 12px ui-monospace,monospace';
-      g.fillText('加权求和  →  x^hist_final  ∈  (b, c, 1, h, w)',CX[0],BY+64);
+      g.fillText(tr('加权求和  →  x^hist_final  ∈  (b, c, 1, h, w)',
+                   'Weighted sum  →  x^hist_final  ∈  (b, c, 1, h, w)'),CX[0],BY+64);
     }
     else{
       bandLabel(g,'沿时间轴拼接，再用一次卷积压成 T = 1','#ffc300');
@@ -1003,7 +1212,8 @@ const STEPS=[
       g.fillStyle='#6c6c96'; g.font='500 11.5px ui-monospace,monospace';
       g.fillText('T : 2 → 1',ax+70,BY+82);
       g.fillStyle='#06ffa5'; g.font='600 11.5px ui-monospace,monospace';
-      g.fillText('感受野里装的是被稳稳对齐到同一个目标上的时空一致信息',ax+150,BY+82);
+      g.fillText(tr('感受野里装的是被稳稳对齐到同一个目标上的时空一致信息',
+                   'The RF now holds spatiotemporally consistent info locked onto the same target'),ax+150,BY+82);
     }
   });
 })();
@@ -1033,20 +1243,34 @@ const STEPS=[
     const W=1260,H=462;
     let idx=DATA.tgt_in, playing=true, acc=0, last=0, trace=true;
     const el=document.getElementById('filmIdx'), val=document.getElementById('filmVal');
+    const filmPlayLabel=()=>playing?tr('⏸ 暂停','⏸ Pause'):tr('▶ 播放','▶ Play');
+    const refreshFilmUI=()=>{
+      document.getElementById('filmBtn').textContent=filmPlayLabel();
+      document.getElementById('traceBtn').textContent=tr('显示航迹','Show track');
+      const tk=DATA.track;
+      document.getElementById('filmCap').innerHTML=tr(
+        `序列 ${DATA.seq} · RD ${C.H}×${C.W}，此处裁剪 ${CH}×${CW}（行 ${C.r0}–${C.r0+CH}，列 ${C.c0}–${C.c0+CW}）。`
+        +` 目标以约 ${((tk[8][1]-tk[0][1])/8).toFixed(1)} 列/帧匀速右移。该模型以窗口`
+        +`<b>最后一帧</b>为锚点：把预测逐帧与真值比对，IoU 只在 #${DATA.tgt_in} 上非零`
+        +`（${DATA.seg_iou[DATA.tgt_in].toFixed(3)}），其余 8 帧全为 0。`,
+        `Sequence ${DATA.seq} · RD ${C.H}×${C.W}, cropped here to ${CH}×${CW} `
+        +`(rows ${C.r0}–${C.r0+CH}, cols ${C.c0}–${C.c0+CW}). `
+        +`The target drifts right at ~${((tk[8][1]-tk[0][1])/8).toFixed(1)} cols/frame. `
+        +`This model anchors on the window’s <b>last frame</b>: per-frame IoU against GT is non-zero `
+        +`only at #${DATA.tgt_in} (${DATA.seg_iou[DATA.tgt_in].toFixed(3)}); the other 8 frames are 0.`
+      );
+    };
     el.oninput=()=>{idx=+el.value; val.textContent='#'+idx; playing=false;
-      const b=document.getElementById('filmBtn'); b.textContent='▶ 播放'; b.classList.remove('on');};
+      const b=document.getElementById('filmBtn'); b.textContent=tr('▶ 播放','▶ Play'); b.classList.remove('on');};
     document.getElementById('filmBtn').onclick=e=>{
-      playing=!playing; e.target.textContent=playing?'⏸ 暂停':'▶ 播放';
+      playing=!playing; e.target.textContent=filmPlayLabel();
       e.target.classList.toggle('on',playing);};
     document.getElementById('traceBtn').onclick=e=>{
       trace=!trace; e.target.classList.toggle('on',trace);};
     document.getElementById('traceBtn').classList.add('on');
+    refreshFilmUI();
+    onLang(refreshFilmUI);
     const tk=DATA.track;
-    document.getElementById('filmCap').innerHTML=
-      `序列 ${DATA.seq} · RD ${C.H}×${C.W}，此处裁剪 ${CH}×${CW}（行 ${C.r0}–${C.r0+CH}，列 ${C.c0}–${C.c0+CW}）。`
-      +` 目标以约 ${((tk[8][1]-tk[0][1])/8).toFixed(1)} 列/帧匀速右移。该模型以窗口`
-      +`<b>最后一帧</b>为锚点：把预测逐帧与真值比对，IoU 只在 #${DATA.tgt_in} 上非零`
-      +`（${DATA.seg_iou[DATA.tgt_in].toFixed(3)}），其余 8 帧全为 0。`;
 
     stage('cvFilm',W,H,(g,t)=>{
       if(!last)last=t; const dt=Math.min(t-last,.05); last=t;
@@ -1091,9 +1315,12 @@ const STEPS=[
         g.fillText('#'+k,bx,by+22);
       }
       g.fillStyle='#9e9ec8'; g.font='600 13px ui-monospace,monospace';
-      g.fillText('输入帧 #'+idx+(idx===DATA.tgt_in?'   ← 目标帧（被监督的那一帧）':''),x0,60);
+      g.fillText(tr('输入帧 #','Input frame #')+idx+(idx===DATA.tgt_in?tr('   ← 目标帧（被监督的那一帧）','   ← target frame (the supervised one)'):''),x0,60);
       g.fillStyle='#6c6c96'; g.font='500 11px ui-monospace,monospace';
-      g.fillText(`9 个输入帧经两层无填充时间卷积压成 5 个时间位置：最后一个作目标（时间感受野正好以 #${DATA.tgt_in} 收尾），其余 4 个作历史 τ=0…3`,x0,H-16);
+      g.fillText(tr(
+        `9 个输入帧经两层无填充时间卷积压成 5 个时间位置：最后一个作目标（时间感受野正好以 #${DATA.tgt_in} 收尾），其余 4 个作历史 τ=0…3`,
+        `9 input frames → 5 temporal positions via two unpadded temporal convs: the last is the target (RF ends on #${DATA.tgt_in}); the other 4 are history τ=0…3`
+      ),x0,H-16);
     });
   })();
 
@@ -1101,10 +1328,15 @@ const STEPS=[
   (function(){
     const W=760,H=548;
     let dev=true;
-    document.getElementById('devBtn').onclick=e=>{
-      dev=!dev; e.target.classList.toggle('on',dev);
-      e.target.textContent=dev?'显示偏离均匀量':'显示原始 a';
+    const refreshDevBtn=()=>{
+      document.getElementById('devBtn').textContent=
+        dev?tr('显示偏离均匀量','Show deviation from uniform'):tr('显示原始 a','Show raw a');
     };
+    document.getElementById('devBtn').onclick=e=>{
+      dev=!dev; e.target.classList.toggle('on',dev); refreshDevBtn();
+    };
+    refreshDevBtn();
+    onLang(refreshDevBtn);
     const probes=DATA.probes, uni=1/N;
     let mx=0;
     probes.forEach(p=>p.attn.forEach(r=>r.forEach(v=>{mx=Math.max(mx,Math.abs(v-uni));})));
@@ -1113,25 +1345,34 @@ const STEPS=[
     const spread=p=>Math.max(...p.score.map(s=>Math.max(...s)-Math.min(...s)));
     const sTgt=spread(probes.find(p=>p.key==='tgt'));
     const sOth=Math.max(...probes.filter(p=>p.key!=='tgt').map(spread));
-    const put=(id,v)=>{const e=document.getElementById(id); if(e)e.textContent=v;};
+    const put=(id,v)=>{
+      document.querySelectorAll('[id="'+id+'"],[id="'+id+'En"]').forEach(e=>{ e.textContent=v; });
+    };
     put('devPct','±'+(mx*100).toFixed(1));
     put('thetaV',String(TH));
     put('ratioMax',Math.exp(1/TH).toFixed(1));
     put('spreadMax',Math.max(sTgt,sOth).toFixed(2));
     put('ratioObs',Math.exp(Math.max(sTgt,sOth)/TH).toFixed(2));
-    put('tgtVsBg',(sTgt/(sOth||1)).toFixed(1));
-    document.getElementById('attnCap').textContent=`n=${N} 候选 · 均匀值 1/${N}=${uni.toFixed(4)}`;
-    const NAME={tgt:'目标点',near:'目标邻域',bg:'背景点'};
+    put('tgtVsBg',(sTgt/(sOth||1e-9)).toFixed(1));
+    const refreshAttnCap=()=>{
+      document.getElementById('attnCap').textContent=
+        tr(`n=${N} 候选 · 均匀值 1/${N}=${uni.toFixed(4)}`,
+          `n=${N} candidates · uniform 1/${N}=${uni.toFixed(4)}`);
+    };
+    refreshAttnCap();
+    onLang(refreshAttnCap);
+    const NAME=()=>({tgt:tr('目标点','Target'),near:tr('目标邻域','Near target'),bg:tr('背景点','Background')});
     const COL={tgt:'#ffc300',near:'#ed6925',bg:'#4cc9f0'};
 
     stage('cvAttn',W,H,(g,t)=>{
       const cell=38, gw=cell*KN, x0=124, y0=74, gap=(W-x0-24)/NH;
+      const names=NAME();
       g.fillStyle='#9e9ec8'; g.font='600 11.5px ui-monospace,monospace';
       for(let h=0;h<NH;h++) g.fillText(TAU[h], x0+h*gap, y0-14);
       probes.forEach((p,pi)=>{
         const y=y0+pi*(gw+30);
         g.fillStyle=COL[p.key]; g.font='600 12.5px ui-monospace,monospace';
-        g.fillText(NAME[p.key],12,y+gw/2-4);
+        g.fillText(names[p.key],12,y+gw/2-4);
         g.fillStyle='#6c6c96'; g.font='500 10px ui-monospace,monospace';
         g.fillText('('+p.i+', '+p.j+')',12,y+gw/2+13);
         for(let h=0;h<NH;h++){
@@ -1151,14 +1392,14 @@ const STEPS=[
       // 色标
       const ly=H-26;
       g.fillStyle='#6c6c96'; g.font='500 10.5px ui-monospace,monospace';
-      g.fillText(dev?'低于 1/n':'低',x0-4,ly);
+      g.fillText(dev?tr('低于 1/n','below 1/n'):tr('低','low'),x0-4,ly);
       for(let i=0;i<170;i++){
         g.fillStyle = dev ? diverge(i/169*2-1) : infernoCss(i/169);
         g.fillRect(x0+72+i*1.7,ly-11,2,11);
       }
-      g.fillText(dev?'高于 1/n':'高',x0+72+300,ly);
+      g.fillText(dev?tr('高于 1/n','above 1/n'):tr('高','high'),x0+72+300,ly);
       g.fillStyle='#6c6c96'; g.font='500 10px ui-monospace,monospace';
-      g.fillText(dev?'格内数字 = (a − 1/n) × 100':'格内数字 = a',x0+72,ly+16);
+      g.fillText(dev?tr('格内数字 = (a − 1/n) × 100','cell = (a − 1/n) × 100'):tr('格内数字 = a','cell = a'),x0+72,ly+16);
     });
   })();
 
@@ -1166,21 +1407,28 @@ const STEPS=[
   (function(){
     const W=760,H=548;
     const probes=DATA.probes;
-    const NAME={tgt:'目标点',near:'目标邻域',bg:'背景点'};
+    const NAME=()=>({tgt:tr('目标点','Target'),near:tr('目标邻域','Near target'),bg:tr('背景点','Background')});
     const COL={tgt:'#ffc300',near:'#ed6925',bg:'#4cc9f0'};
     let mn=1,mx=0;
     probes.forEach(p=>p.time_w.forEach(v=>{mn=Math.min(mn,v);mx=Math.max(mx,v);}));
-    document.getElementById('timeCap').textContent=
-      `每个位置在 4 个历史帧上的时间权重，Σ=1，均匀值 ${(1/NH).toFixed(3)}。`
-      +` 实测范围 ${mn.toFixed(3)} – ${mx.toFixed(3)}。`;
+    const refreshTimeCap=()=>{
+      document.getElementById('timeCap').textContent=tr(
+        `每个位置在 4 个历史帧上的时间权重，Σ=1，均匀值 ${(1/NH).toFixed(3)}。`
+        +` 实测范围 ${mn.toFixed(3)} – ${mx.toFixed(3)}。`,
+        `Per-site temporal weights over 4 history frames, Σ=1, uniform ${(1/NH).toFixed(3)}. `
+        +`Observed range ${mn.toFixed(3)} – ${mx.toFixed(3)}.`
+      );
+    };
+    refreshTimeCap(); onLang(refreshTimeCap);
     stage('cvTime',W,H,(g,t)=>{
       const x0=118, y0=64, bw=(W-x0-56)/NH-16, uni=1/NH;
+      const names=NAME();
       g.fillStyle='#9e9ec8'; g.font='600 11.5px ui-monospace,monospace';
       for(let h=0;h<NH;h++) g.fillText(TAU[h], x0+h*(bw+16)+bw/2-18, y0-12);
       probes.forEach((p,pi)=>{
         const y=y0+pi*150, hgt=96;
         g.fillStyle=COL[p.key]; g.font='600 12px ui-monospace,monospace';
-        g.fillText(NAME[p.key],14,y+hgt/2);
+        g.fillText(names[p.key],14,y+hgt/2);
         for(let h=0;h<NH;h++){
           const x=x0+h*(bw+16), v=p.time_w[h];
           const frac=clamp((v-mn)/((mx-mn)||1)*.78+.2,0,1);
@@ -1201,8 +1449,12 @@ const STEPS=[
         g.fillText('1/'+NH,W-38,y+hgt*(1-uf)+3);
       });
       g.fillStyle='#6c6c96'; g.font='500 10.5px ui-monospace,monospace';
-      g.fillText('纵轴已放大到实测区间 '+mn.toFixed(3)+' – '+mx.toFixed(3)+
-                 '；虚线为均匀值 1/'+NH+'。真实差异很小，正是「稳」的体现。',12,H-14);
+      g.fillText(tr(
+        '纵轴已放大到实测区间 '+mn.toFixed(3)+' – '+mx.toFixed(3)+
+        '；虚线为均匀值 1/'+NH+'。真实差异很小，正是「稳」的体现。',
+        'Y-axis zoomed to the observed range '+mn.toFixed(3)+' – '+mx.toFixed(3)+
+        '; dashed line = uniform 1/'+NH+'. Tiny gaps are exactly the “steady” behaviour.'
+      ),12,H-14);
     });
   })();
 
@@ -1212,11 +1464,11 @@ const STEPS=[
     stage('cvFeat',W,H,(g,t)=>{
       const x0=20,w=W-40,h=w*CH/CW;
       const lab=(y,txt,col)=>{g.fillStyle=col;g.font='600 12px ui-monospace,monospace';g.fillText(txt,x0,y);};
-      lab(30,'x^tgt · 目标帧原始特征 (通道 L2)','#ff6b6b');
+      lab(30,tr('x^tgt · 目标帧原始特征 (通道 L2)','x^tgt · raw target feature (channel L2)'),'#ff6b6b');
       g.imageSmoothingEnabled=true; g.drawImage(featTgt,x0,42,w,h);
       g.strokeStyle='rgba(255,107,107,.6)';g.lineWidth=1.4;roundRect(g,x0,42,w,h,5);g.stroke();
       const y2=42+h+52;
-      lab(y2-12,'x^hist_final · 时空聚焦后的历史特征','#b15cff');
+      lab(y2-12,tr('x^hist_final · 时空聚焦后的历史特征','x^hist_final · history after spatiotemporal focusing'),'#b15cff');
       g.drawImage(featFin,x0,y2,w,h);
       g.strokeStyle='rgba(177,92,255,.6)';roundRect(g,x0,y2,w,h,5);g.stroke();
       // 目标位置标记
@@ -1240,14 +1492,21 @@ const STEPS=[
       if(a)gn++; if(b)sn++; if(a&&b)inter++; if(a||b)uni++;
     }
     const iou=uni?inter/uni:0;
-    document.getElementById('segCap').textContent=
-      `真值 ${gn} 像素，预测 ${sn} 像素，交集 ${inter}，IoU = ${iou.toFixed(3)}。`
-      + (inter===uni ? ' 预测与真值逐像素完全重合，故全部显示为白色。'
-                     : ' 青 = 仅真值，琥珀 = 仅预测，重叠处为白。');
+    const refreshSegCap=()=>{
+      document.getElementById('segCap').textContent=tr(
+        `真值 ${gn} 像素，预测 ${sn} 像素，交集 ${inter}，IoU = ${iou.toFixed(3)}。`
+        + (inter===uni ? ' 预测与真值逐像素完全重合，故全部显示为白色。'
+                       : ' 青 = 仅真值，琥珀 = 仅预测，重叠处为白。'),
+        `GT ${gn} px, prediction ${sn} px, intersection ${inter}, IoU = ${iou.toFixed(3)}.`
+        + (inter===uni ? ' Prediction matches GT pixel-for-pixel, so everything is white.'
+                       : ' Cyan = GT only, amber = pred only, overlap is white.')
+      );
+    };
+    refreshSegCap(); onLang(refreshSegCap);
     stage('cvSeg',W,H,(g,t)=>{
       const x0=20,w=W-40,h=w*CH/CW, y0=54;
       g.fillStyle='#9e9ec8'; g.font='600 12px ui-monospace,monospace';
-      g.fillText('目标帧 #'+DATA.tgt_in+' 的预测结果',x0,32);
+      g.fillText(tr('目标帧 #'+DATA.tgt_in+' 的预测结果','Prediction on target frame #'+DATA.tgt_in),x0,32);
       g.imageSmoothingEnabled=true;
       g.drawImage(rdCv[DATA.tgt_in],x0,y0,w,h);
       g.globalAlpha=.55; g.fillStyle='#000'; g.fillRect(x0,y0,w,h); g.globalAlpha=1;
@@ -1263,7 +1522,8 @@ const STEPS=[
       const p=DATA.track[DATA.tgt_in], zc=16, zr=9, zrow=6;
       const zy=y0+h+30;
       g.fillStyle='#6c6c96'; g.font='500 11px ui-monospace,monospace';
-      g.fillText('目标处 '+(zrow*2+1)+'×'+(zr*2+1)+' 像素级放大',x0,zy+14);
+      g.fillText(tr('目标处 '+(zrow*2+1)+'×'+(zr*2+1)+' 像素级放大',
+                   'Pixel zoom '+(zrow*2+1)+'×'+(zr*2+1)+' at the target'),x0,zy+14);
       for(let r=-zrow;r<=zrow;r++)for(let c=-zr;c<=zr;c++){
         const rr=p[0]-C.r0+r, cc=p[1]-C.c0+c;
         if(rr<0||rr>=CH||cc<0||cc>=CW) continue;
@@ -1273,7 +1533,9 @@ const STEPS=[
         g.fillRect(x0+(c+zr)*zc, zy+24+(r+zrow)*zc, zc-1, zc-1);
       }
       const lx=x0+(zr*2+1)*zc+30, ly=zy+40;
-      [['#ffffff','真值 ∩ 预测'],['#4cc9f0','仅真值'],['#ffc300','仅预测']].forEach((e,i)=>{
+      [[ '#ffffff', tr('真值 ∩ 预测','GT ∩ Pred') ],
+       [ '#4cc9f0', tr('仅真值','GT only') ],
+       [ '#ffc300', tr('仅预测','Pred only') ]].forEach((e,i)=>{
         g.fillStyle=e[0]; g.fillRect(lx,ly+i*24-9,11,11);
         g.fillStyle='#9e9ec8'; g.font='500 11.5px ui-monospace,monospace';
         g.fillText(e[1],lx+19,ly+i*24);
@@ -1285,7 +1547,31 @@ const STEPS=[
 })();
 
 /* ═══════════ §5 公式 ═══════════ */
-document.getElementById('mathBox').innerHTML = [
+function renderMath(){
+  document.getElementById('mathBox').innerHTML = (LANG==='en' ? [
+ '<span class="cm">// 1. Target / history split (t = 5; target is the last temporal position)</span>',
+ 'x<sup>tgt</sup> = x[:, :, t<sub>i</sub>]&nbsp;&nbsp;&nbsp;&nbsp;H = { τ : τ ≠ t<sub>i</sub> },&nbsp; |H| = t − 1 = 4',
+ '',
+ '<span class="cm">// 2. Local candidates (replication padding, n = k<sub>n</sub>² = 9)</span>',
+ 'x<sup>hist</sup><sub>τ,p,q</sub> = x<sub>τ</sub>[ p + Δ<sub>q</sub> ],&nbsp;&nbsp; Δ<sub>q</sub> ∈ {−1,0,1}²',
+ '',
+ '<span class="cm">// 3. Learned foreground confidence (class 0 = background)</span>',
+ 'L = Conv<sub>1×1×1</sub>( Conv3d<sub>(2,1,k)</sub>( interleave( x<sup>hist</sup>, x<sup>tgt</sup> ) ) )',
+ 's<sub>τ,p,q</sub> = 1 − <span class="op">softmax</span><sub>class</sub>(L)<sub>0</sub>&nbsp;&nbsp;∈ [0, 1]',
+ '',
+ '<span class="cm">// 4. Spatial focusing — gimbal yaw / pitch</span>',
+ 'a<sub>τ,p,q</sub> = <span class="op">softmax</span><sub>q</sub>( s<sub>τ,p,q</sub> / θ )',
+ 'x̂<sup>hist</sup><sub>τ,p</sub> = <span class="op">Σ</span><sub>q=0..n−1</sub> a<sub>τ,p,q</sub> · x<sup>hist</sup><sub>τ,p,q</sub>',
+ '',
+ '<span class="cm">// 5. Temporal focusing — gimbal follow gain</span>',
+ 'u<sub>τ,p</sub> = (1/n) <span class="op">Σ</span><sub>q</sub> s<sub>τ,p,q</sub>',
+ 'w<sub>τ,p</sub> = <span class="op">softmax</span><sub>τ</sub>( u<sub>τ,p</sub> )',
+ 'x<sup>hist</sup><sub>final,p</sub> = <span class="op">Σ</span><sub>τ∈H</sub> w<sub>τ,p</sub> · x̂<sup>hist</sup><sub>τ,p</sub>',
+ '',
+ '<span class="cm">// 6. Fusion — shutter click</span>',
+ 'x<sup>fuse</sup> = <span class="op">concat</span><sub>T</sub>( x<sup>hist</sup><sub>final</sub>, x<sup>tgt</sup> )&nbsp;&nbsp;∈ ℝ<sup>b×c×2×h×w</sup>',
+ 'x<sup>out</sup> = Conv3d<sub>(2,1,1)</sub>( x<sup>fuse</sup> )&nbsp;&nbsp;∈ ℝ<sup>b×128×1×h×w</sup>'
+] : [
  '<span class="cm">// 1. 目标 / 历史划分（t = 5，目标取最后一个时间位置）</span>',
  'x<sup>tgt</sup> = x[:, :, t<sub>i</sub>]&nbsp;&nbsp;&nbsp;&nbsp;H = { τ : τ ≠ t<sub>i</sub> },&nbsp; |H| = t − 1 = 4',
  '',
@@ -1308,7 +1594,10 @@ document.getElementById('mathBox').innerHTML = [
  '<span class="cm">// 6. 融合 —— 快门按下</span>',
  'x<sup>fuse</sup> = <span class="op">concat</span><sub>T</sub>( x<sup>hist</sup><sub>final</sub>, x<sup>tgt</sup> )&nbsp;&nbsp;∈ ℝ<sup>b×c×2×h×w</sup>',
  'x<sup>out</sup> = Conv3d<sub>(2,1,1)</sub>( x<sup>fuse</sup> )&nbsp;&nbsp;∈ ℝ<sup>b×128×1×h×w</sup>'
-].join('<br>');
+]).join('<br>');
+}
+renderMath();
+onLang(renderMath);
 
 /* ═══════════ 入场动画 ═══════════ */
 const revealIO=new IntersectionObserver((es,o)=>{

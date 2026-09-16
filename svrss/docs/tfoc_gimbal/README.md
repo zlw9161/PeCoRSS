@@ -29,6 +29,9 @@ xdg-open svrss/docs/tfoc_gimbal.html
 The page is self-contained (HTML + CSS + Canvas JS + inlined real tensors).
 No CDN and no network requests.
 
+Use the **中文 / EN** pill in the top-right corner to switch language.
+The choice is saved in `localStorage` (`tfoc_lang`).
+
 ## What’s inside
 
 | Section | Content |
@@ -91,6 +94,31 @@ If `data.json` is missing, `build.py` still emits a page; §4 (real data) is omi
   not from the demo’s temporal-RF centre offset. With the current checkpoint the
   anchor is the **last** input frame (preset → `#8`, IoU `1.000`, all other frames `0`),
   so the target feature position’s temporal receptive field ends exactly on it.
+
+## Changelog
+
+### v1.2.0 (`tfoc-demo-html-v1.2.0`)
+
+- **Bilingual UI** — one-click 中文 / EN toggle (top-right). All static copy,
+  canvas labels, buttons, and §4 captions refresh on switch; preference persists
+  across reloads.
+- **Animation fix** — the i18n helper was originally named `t()`, which shadowed
+  every canvas draw callback’s time parameter `t`. Scrolling into §1–§4 threw
+  `TypeError: t is not a function` and froze the whole `requestAnimationFrame`
+  loop. Renamed the helper to `tr()` and wrapped per-canvas draws in try/catch so
+  one panel cannot kill the rest.
+
+### v1.1.0 (`tfoc-demo-html-v1.1.0`)
+
+- Re-exported real data with the **last-frame-anchored** checkpoint
+  (`pdr-ss3-t9-0.90.95-…-s42_0`).
+- Corrected §4 narrative for **`sigma_spa = 0.9`** (not 1.0); `export_data.py`
+  sets `attn_temperature` explicitly.
+- §5 reframed as “what TFoC did right” (no side-by-side v1 comparison).
+
+### v1.0.0 (`tfoc-demo-html-v1.0.0`)
+
+- Initial interactive gimbal explainer (hero + §1–§5, real tensor export).
 
 ## License
 
