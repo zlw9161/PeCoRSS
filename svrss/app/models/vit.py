@@ -146,13 +146,13 @@ class ViT(Module):
 
         x = self.transformer(x)
 
-        # # Classification task
+        # # classification task
         # x = x[:, 0]
         # x = self.to_latent(x)
         # x = self.mlp_head(x)
 
-        # Segmentation task
-        x = x[:, 1:, :]  # Remove CLS, shape (batch, num_patches, embed_dim)
+        # segmentation task
+        x = x[:, 1:, :]  # drop CLS, shape (batch, num_patches, embed_dim)
         x = self.seg_head(x)
 
         return x
@@ -160,6 +160,6 @@ class ViT(Module):
 if __name__ == "__main__":
     model = ViT()
     input_img = torch.randn(2, 2, 128, 1024)  
-    print("Input shape:", input_img.shape)  # Output: torch.Size([2, 2, 128, 1024])
+    print("input shape:", input_img.shape)  # output: torch.Size([2, 2, 128, 1024])
     output = model(input_img)
-    print("Output shape:", output.shape)  # Output: torch.Size([2, 2, 128, 1024])
+    print("output shape:", output.shape)  # output: torch.Size([2, 2, 128, 1024])

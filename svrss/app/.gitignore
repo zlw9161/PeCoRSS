@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.py[cod]
 *.so
@@ -44,23 +44,49 @@ env/
 *.pth.tar
 *.safetensors
 
-# Model checkpoints (large files)
-# NOTE: removed 'models/' to keep Python source files tracked.
-# Global *.pt / *.pth rules above already ignore weight files.
-models/**/results/
+# ============================================================
+# Commit policy
+#   GitHub repo : code only - what is needed to run the app
+#   Download    : pre-trained weights and the datasets are published
+#                 separately (download link to be announced)
+# ============================================================
+
+# Old repository backup, kept locally only
+.git.backup-*/
+
+# Weights (~2.5 GB) and datasets never go through GitHub
+models/*/
+ckpts/
+datasets/
+
+# Onboarding notes / HF Space card, kept in the Hugging Face mirror
+environment.yml
+DEPLOY.md
+HF_README.md
+
 checkpoints/
 pretrained/
 weights/
 
 # Data files (large files)
-datasets/
 data/
 *.mat
 *.h5
 *.hdf5
 *.npy
 *.npz
+*.png
 
+# Exception: the logos are needed by the README and the app header
+!logos/*.png
+!logos/*.jpg
+
+# Exception: the README screenshots ship with the repository
+!images/*.png
+!images/*.jpg
+
+# huggingface_hub 下载/上传时产生的本地缓存
+.cache/
 
 # Logs
 *.log
@@ -70,6 +96,9 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# Backup files (e.g. the *.onehot.npy.bak produced by the annotation converter)
+*.bak
 
 # Environment variables
 .env
